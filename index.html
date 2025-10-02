@@ -4,14 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kawaii Cat Task Manager 🐱</title>
-<!-- PWA Meta Tags -->
-<meta name="theme-color" content="#a855f7">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Cat Tasks">
-<link rel="manifest" href="./manifest.json">
-<link rel="apple-touch-icon" href="./icon-192.png">
-<meta name="mobile-web-app-capable" content="yes">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#a855f7">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Cat Tasks">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -82,7 +84,6 @@
             transform: rotate(180deg);
         }
 
-        /* Celebration Animation Styles */
         .celebration-overlay {
             position: fixed;
             top: 0;
@@ -206,17 +207,17 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect } = React;
 
         // 🔥 REPLACE THIS WITH YOUR FIREBASE CONFIG
         const firebaseConfig = {
-  apiKey: "AIzaSyDC6-FAGsBrCWZ6yiKM3O-7G7m6LwWhdDk",
-  authDomain: "nekodo-dc4e5.firebaseapp.com",
-  projectId: "nekodo-dc4e5",
-  storageBucket: "nekodo-dc4e5.firebasestorage.app",
-  messagingSenderId: "735058315811",
-  appId: "1:735058315811:web:55274dd5c2d70f789a7f96"
-};
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
 
         // Initialize Firebase
         let db = null;
@@ -244,7 +245,25 @@
                 } catch (e) {
                     // Silently fail
                 }
+            },
+            removeItem: (key) => {
+                try {
+                    localStorage.removeItem(key);
+                } catch (e) {
+                    // Silently fail
+                }
             }
+        };
+
+        // Simple hash function for passwords (NOT secure for production!)
+        const simpleHash = (str) => {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            return hash.toString(36);
         };
 
         // Celebration Component
@@ -252,7 +271,6 @@
             const [confetti, setConfetti] = useState([]);
 
             useEffect(() => {
-                // Generate confetti
                 const confettiEmojis = ['✨', '🎉', '🎊', '⭐', '💫', '🌟', '🎈', '🎀', '💖', '🐾'];
                 const newConfetti = [];
                 
@@ -267,7 +285,6 @@
                 
                 setConfetti(newConfetti);
 
-                // Auto close after 3 seconds
                 const timer = setTimeout(() => {
                     onClose();
                 }, 3000);
@@ -307,7 +324,193 @@
             );
         }
 
-        function TaskManager() {
+        // Login/Signup Component
+        function LoginScreen({ onLogin }) {
+            const [isLogin, setIsLogin] = useState(true);
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError('');
+                
+                if (!username.trim() || !password.trim()) {
+                    setError('Please enter both username and password');
+                    return;
+                }
+
+                if (username.length < 3) {
+                    setError('Username must be at least 3 characters');
+                    return;
+                }
+
+                if (password.length < 4) {
+                    setError('Password must be at least 4 characters');
+                    return;
+                }
+
+                if (!db) {
+                    setError('Firebase not configured. Please check your setup.');
+                    return;
+                }
+
+                setLoading(true);
+
+                try {
+                    const usernameLower = username.toLowerCase().trim();
+                    const passwordHash = simpleHash(password);
+
+                    // Check if user exists
+                    const userDoc = await db.collection('users').doc(usernameLower).get();
+
+                    if (isLogin) {
+                        // LOGIN
+                        if (!userDoc.exists) {
+                            setError('Username not found. Please sign up first!');
+                            setLoading(false);
+                            return;
+                        }
+
+                        const userData = userDoc.data();
+                        if (userData.passwordHash !== passwordHash) {
+                            setError('Incorrect password');
+                            setLoading(false);
+                            return;
+                        }
+
+                        // Login successful!
+                        safeLocalStorage.setItem('currentUser', usernameLower);
+                        safeLocalStorage.setItem('userSession', passwordHash);
+                        onLogin(usernameLower);
+                    } else {
+                        // SIGNUP
+                        if (userDoc.exists) {
+                            setError('Username already taken. Please choose another one!');
+                            setLoading(false);
+                            return;
+                        }
+
+                        // Create new user
+                        await db.collection('users').doc(usernameLower).set({
+                            username: usernameLower,
+                            passwordHash: passwordHash,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
+                        // Auto-login after signup
+                        safeLocalStorage.setItem('currentUser', usernameLower);
+                        safeLocalStorage.setItem('userSession', passwordHash);
+                        onLogin(usernameLower);
+                    }
+                } catch (error) {
+                    console.error('Auth error:', error);
+                    setError('Something went wrong. Please try again.');
+                }
+
+                setLoading(false);
+            };
+
+            return (
+                <div className="min-h-screen p-4 flex items-center justify-center relative overflow-hidden" style={{background: 'linear-gradient(135deg, #e9d5ff 0%, #ddd6fe 50%, #c7d2fe 100%)'}}>
+                    {/* Floating paw prints */}
+                    <div className="paw-print" style={{top: '10%', left: '5%'}}>🐾</div>
+                    <div className="paw-print" style={{top: '20%', right: '10%'}}>🐾</div>
+                    <div className="paw-print" style={{bottom: '15%', left: '15%'}}>🐾</div>
+                    <div className="paw-print" style={{bottom: '25%', right: '5%'}}>🐾</div>
+
+                    <div className="w-full max-w-md">
+                        <div className="bg-white rounded-3xl shadow-2xl p-8 relative overflow-hidden">
+                            {/* Decorative cat */}
+                            <div className="absolute top-0 right-0 text-6xl cat-bounce opacity-20">
+                                🐱
+                            </div>
+
+                            {/* Header */}
+                            <div className="text-center mb-8">
+                                <div className="text-7xl mb-4 cat-bounce">😺</div>
+                                <h1 className="text-4xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent mb-2">
+                                    Kawaii Tasks
+                                </h1>
+                                <p className="text-gray-600 text-lg">
+                                    {isLogin ? 'Welcome back! 🌟' : 'Join the fun! ✨'}
+                                </p>
+                            </div>
+
+                            {/* Form */}
+                            <form onSubmit={handleSubmit} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                                        Username
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
+                                        placeholder="Choose a cool username"
+                                        className="w-full px-4 py-3 border-3 border-purple-300 rounded-2xl focus:outline-none focus:border-pink-400 text-lg font-semibold"
+                                        disabled={loading}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                                        Password
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder="Enter password"
+                                        className="w-full px-4 py-3 border-3 border-purple-300 rounded-2xl focus:outline-none focus:border-pink-400 text-lg font-semibold"
+                                        disabled={loading}
+                                    />
+                                </div>
+
+                                {error && (
+                                    <div className="bg-red-100 border-2 border-red-400 text-red-700 px-4 py-3 rounded-2xl text-sm font-semibold">
+                                        {error}
+                                    </div>
+                                )}
+
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full py-4 bg-gradient-to-r from-pink-400 to-purple-500 text-white rounded-2xl hover:from-pink-500 hover:to-purple-600 font-bold text-lg shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {loading ? '⏳ Loading...' : (isLogin ? '🎯 Login' : '✨ Sign Up')}
+                                </button>
+                            </form>
+
+                            {/* Toggle Login/Signup */}
+                            <div className="mt-6 text-center">
+                                <button
+                                    onClick={() => {
+                                        setIsLogin(!isLogin);
+                                        setError('');
+                                    }}
+                                    className="text-purple-600 hover:text-pink-600 font-bold"
+                                    disabled={loading}
+                                >
+                                    {isLogin ? "Don't have an account? Sign up! 🎉" : 'Already have an account? Login! 👋'}
+                                </button>
+                            </div>
+
+                            {/* Info */}
+                            <div className="mt-6 bg-purple-50 rounded-2xl p-4">
+                                <p className="text-xs text-gray-600 text-center">
+                                    <strong>💡 Tip:</strong> Your username is your unique ID. You can access your tasks from any device by logging in!
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Main Task Manager Component
+        function TaskManager({ username, onLogout }) {
             const [tasks, setTasks] = useState([]);
             const [newTask, setNewTask] = useState('');
             const [newDueDate, setNewDueDate] = useState('');
@@ -318,20 +521,10 @@
             const [addingSubtaskTo, setAddingSubtaskTo] = useState(null);
             const [newSubtask, setNewSubtask] = useState('');
             const [showCelebration, setShowCelebration] = useState(false);
-            const [userId] = useState(() => {
-                let id = safeLocalStorage.getItem('userId');
-                if (!id) {
-                    id = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                    safeLocalStorage.setItem('userId', id);
-                }
-                return id;
-            });
 
-            // Calculate priority for a task
             const calculatePriority = (taskText, dueDate) => {
                 let priority = 0;
                 
-                // Due date scoring (0-50 points)
                 if (dueDate) {
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
@@ -339,19 +532,18 @@
                     due.setHours(0, 0, 0, 0);
                     const daysUntilDue = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
                     
-                    if (daysUntilDue < 0) priority += 50; // Overdue - highest
-                    else if (daysUntilDue === 0) priority += 45; // Due today
-                    else if (daysUntilDue === 1) priority += 40; // Due tomorrow
-                    else if (daysUntilDue === 2) priority += 35; // Due in 2 days
-                    else if (daysUntilDue === 3) priority += 30; // Due in 3 days
-                    else if (daysUntilDue <= 7) priority += 20; // Due this week
-                    else if (daysUntilDue <= 14) priority += 10; // Due in 2 weeks
-                    else priority += 5; // Due later
+                    if (daysUntilDue < 0) priority += 50;
+                    else if (daysUntilDue === 0) priority += 45;
+                    else if (daysUntilDue === 1) priority += 40;
+                    else if (daysUntilDue === 2) priority += 35;
+                    else if (daysUntilDue === 3) priority += 30;
+                    else if (daysUntilDue <= 7) priority += 20;
+                    else if (daysUntilDue <= 14) priority += 10;
+                    else priority += 5;
                 } else {
-                    priority += 15; // No due date - medium priority
+                    priority += 15;
                 }
                 
-                // Keyword scoring (0-30 points)
                 const taskLower = taskText.toLowerCase();
                 const urgentKeywords = ['urgent', 'asap', 'emergency', 'critical', 'deadline', 'important'];
                 const highPriorityKeywords = ['meeting', 'call', 'appointment', 'interview', 'presentation', 'exam', 'test'];
@@ -369,7 +561,6 @@
                 
                 priority += Math.min(keywordScore, 30);
                 
-                // Task length bonus (0-10 points) - shorter tasks are slightly more urgent
                 if (taskText.length < 20) priority += 10;
                 else if (taskText.length < 40) priority += 5;
                 
@@ -381,21 +572,20 @@
                 if (!db) return;
 
                 const unsubscribe = db.collection('tasks')
-                    .where('userId', '==', userId)
+                    .where('username', '==', username)
                     .onSnapshot(snapshot => {
                         const tasksData = [];
                         snapshot.forEach(doc => {
                             tasksData.push({ id: doc.id, ...doc.data() });
                         });
-                        // Sort by priority (highest first)
                         tasksData.sort((a, b) => (b.priority || 0) - (a.priority || 0));
                         setTasks(tasksData);
                     });
 
                 return () => unsubscribe();
-            }, [userId]);
+            }, [username]);
 
-            // Update cat mood based on tasks
+            // Update cat mood
             useEffect(() => {
                 const activeTasks = tasks.filter(t => !t.completed);
                 const overdueTasks = activeTasks.filter(t => {
@@ -412,7 +602,7 @@
             const addTask = async () => {
                 if (!newTask.trim()) return;
                 if (!db) {
-                    alert('Please configure Firebase first! Replace the firebaseConfig in the HTML file.');
+                    alert('Please configure Firebase first!');
                     return;
                 }
                 
@@ -424,7 +614,7 @@
                     dueDate: newDueDate,
                     completed: false,
                     priority: priority,
-                    userId: userId,
+                    username: username,
                     subtasks: [],
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
@@ -435,7 +625,7 @@
                     setNewDueDate('');
                 } catch (error) {
                     console.error('Error adding task:', error);
-                    alert('Error adding task. Make sure Firebase is configured correctly.');
+                    alert('Error adding task. Please try again.');
                 }
                 setSyncing(false);
             };
@@ -483,7 +673,6 @@
                         subtasks: updatedSubtasks
                     });
                     
-                    // Show celebration if subtask was just completed
                     if (!wasCompleted) {
                         setShowCelebration(true);
                     }
@@ -521,7 +710,6 @@
                         completed: !task.completed
                     });
                     
-                    // Show celebration if task was just completed
                     if (!wasCompleted) {
                         setShowCelebration(true);
                     }
@@ -549,15 +737,22 @@
                 }));
             };
 
+            const handleLogout = () => {
+                if (confirm('Are you sure you want to logout? 🐱')) {
+                    safeLocalStorage.removeItem('currentUser');
+                    safeLocalStorage.removeItem('userSession');
+                    onLogout();
+                }
+            };
+
             const getPriorityBorderColor = (priority) => {
-                // Red (high priority) to pink (low priority) gradient
-                if (priority >= 70) return '#dc2626'; // red-600 - Critical
-                if (priority >= 55) return '#ef4444'; // red-500 - Very high
-                if (priority >= 40) return '#f87171'; // red-400 - High
-                if (priority >= 30) return '#fb7185'; // rose-400 - Medium-high
-                if (priority >= 20) return '#f472b6'; // pink-400 - Medium
-                if (priority >= 10) return '#e879f9'; // fuchsia-400 - Medium-low
-                return '#f0abfc'; // fuchsia-300 - Low
+                if (priority >= 70) return '#dc2626';
+                if (priority >= 55) return '#ef4444';
+                if (priority >= 40) return '#f87171';
+                if (priority >= 30) return '#fb7185';
+                if (priority >= 20) return '#f472b6';
+                if (priority >= 10) return '#e879f9';
+                return '#f0abfc';
             };
 
             const getPriorityColor = (priority) => {
@@ -620,36 +815,47 @@
 
             return (
                 <div className="min-h-screen p-4 relative overflow-hidden" style={{background: 'linear-gradient(135deg, #e9d5ff 0%, #ddd6fe 50%, #c7d2fe 100%)'}}>
-                    {/* Celebration Animation */}
                     {showCelebration && (
                         <Celebration onClose={() => setShowCelebration(false)} />
                     )}
 
-                    {/* Floating paw prints */}
                     <div className="paw-print" style={{top: '10%', left: '5%'}}>🐾</div>
                     <div className="paw-print" style={{top: '20%', right: '10%'}}>🐾</div>
                     <div className="paw-print" style={{bottom: '15%', left: '15%'}}>🐾</div>
                     <div className="paw-print" style={{bottom: '25%', right: '5%'}}>🐾</div>
                     
                     <div className="max-w-2xl mx-auto relative">
-                        {/* Kawaii Cat Header */}
                         <div className="bg-white rounded-3xl shadow-2xl p-6 mb-6 relative overflow-hidden">
                             <div className="absolute top-0 right-0 text-6xl cat-bounce opacity-20">
                                 🐱
                             </div>
                             
-                            <div className="flex items-center gap-4 mb-4">
-                                <div className="text-6xl cat-bounce">{getCatEmoji()}</div>
-                                <div className="flex-1">
-                                    <h1 className="text-4xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
-                                        Kawaii Task Manager
-                                    </h1>
-                                    <p className="text-lg text-gray-600 mt-1">{getCatMessage()}</p>
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-4 flex-1">
+                                    <div className="text-6xl cat-bounce">{getCatEmoji()}</div>
+                                    <div className="flex-1">
+                                        <h1 className="text-4xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
+                                            Kawaii Task Manager
+                                        </h1>
+                                        <p className="text-lg text-gray-600 mt-1">{getCatMessage()}</p>
+                                        <p className="text-sm text-purple-600 font-semibold mt-1">
+                                            👤 Logged in as: {username}
+                                        </p>
+                                    </div>
                                 </div>
-                                {syncing && (
-                                    <div className="text-2xl sparkle">✨</div>
-                                )}
+                                <button
+                                    onClick={handleLogout}
+                                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-sm transition-all"
+                                >
+                                    🚪 Logout
+                                </button>
                             </div>
+                            
+                            {syncing && (
+                                <div className="mb-4 text-center">
+                                    <span className="text-2xl sparkle inline-block">✨ Syncing...</span>
+                                </div>
+                            )}
                             
                             <div className="space-y-3">
                                 <input
@@ -682,7 +888,6 @@
                             </div>
                         </div>
 
-                        {/* Active Tasks */}
                         <div className="bg-white rounded-3xl shadow-2xl p-6 mb-6">
                             <div className="flex items-center gap-3 mb-4">
                                 <h2 className="text-2xl font-bold text-gray-800">
@@ -747,7 +952,6 @@
                                                             )}
                                                         </div>
 
-                                                        {/* Subtasks dropdown */}
                                                         <div className="mt-3">
                                                             <div className="flex gap-2">
                                                                 {hasSubtasks && (
@@ -767,7 +971,6 @@
                                                                 </button>
                                                             </div>
 
-                                                            {/* Add subtask input */}
                                                             {addingSubtaskTo === task.id && (
                                                                 <div className="flex gap-2 mt-2">
                                                                     <input
@@ -788,7 +991,6 @@
                                                                 </div>
                                                             )}
 
-                                                            {/* Subtasks list */}
                                                             <div className={`subtask-list ${isExpanded ? 'open' : ''}`}>
                                                                 {hasSubtasks && (
                                                                     <div className="mt-3 space-y-2 pl-2 border-l-2 border-purple-200">
@@ -837,7 +1039,6 @@
                             )}
                         </div>
 
-                        {/* Completed Tasks - Collapsible Sleeve */}
                         {completedTasks.length > 0 && (
                             <div className="bg-white rounded-3xl shadow-2xl p-6 overflow-hidden">
                                 <button
@@ -901,7 +1102,6 @@
                             </div>
                         )}
                         
-                        {/* Footer cat */}
                         <div className="text-center mt-8 text-4xl cat-bounce">
                             🐾
                         </div>
@@ -910,33 +1110,58 @@
             );
         }
 
-        ReactDOM.render(<TaskManager />, document.getElementById('root'));
-    </script>
-<!-- PWA Service Worker Registration -->
-<script>
-    // Register service worker for PWA functionality
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./service-worker.js')
-                .then((registration) => {
-                    console.log('✨ PWA Service Worker registered!', registration.scope);
-                })
-                .catch((error) => {
-                    console.log('Service Worker registration failed:', error);
-                });
-        });
-    }
+        // Main App Component
+        function App() {
+            const [currentUser, setCurrentUser] = useState(null);
+            const [loading, setLoading] = useState(true);
 
-    // Prompt to install PWA
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        console.log('💫 App is installable!');
-        
-        // You can show a custom install button here if you want
-        // For now, browser will show its own install prompt
-    });
-</script>
+            useEffect(() => {
+                // Check if user is already logged in
+                const savedUser = safeLocalStorage.getItem('currentUser');
+                const savedSession = safeLocalStorage.getItem('userSession');
+                
+                if (savedUser && savedSession) {
+                    // Verify session is valid (you could add server-side verification here)
+                    setCurrentUser(savedUser);
+                }
+                
+                setLoading(false);
+            }, []);
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center" style={{background: 'linear-gradient(135deg, #e9d5ff 0%, #ddd6fe 50%, #c7d2fe 100%)'}}>
+                        <div className="text-center">
+                            <div className="text-7xl mb-4 cat-bounce">😺</div>
+                            <p className="text-2xl font-bold text-gray-700">Loading...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (!currentUser) {
+                return <LoginScreen onLogin={setCurrentUser} />;
+            }
+
+            return <TaskManager username={currentUser} onLogout={() => setCurrentUser(null)} />;
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then((registration) => {
+                        console.log('✨ PWA Service Worker registered!', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
+    </script>
 </body>
 </html>
