@@ -643,16 +643,19 @@
                     due.setHours(0, 0, 0, 0);
                     const daysUntilDue = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
                     
-                    if (daysUntilDue < 0) priority += 50;
-                    else if (daysUntilDue === 0) priority += 45;
-                    else if (daysUntilDue === 1) priority += 40;
-                    else if (daysUntilDue === 2) priority += 35;
-                    else if (daysUntilDue === 3) priority += 30;
-                    else if (daysUntilDue <= 7) priority += 20;
-                    else if (daysUntilDue <= 14) priority += 10;
-                    else priority += 5;
+                    // Much stronger date-based priority
+                    if (daysUntilDue < 0) priority += 100;  // Overdue = MAX priority
+                    else if (daysUntilDue === 0) priority += 95;  // Today
+                    else if (daysUntilDue === 1) priority += 90;  // Tomorrow
+                    else if (daysUntilDue === 2) priority += 85;  // 2 days
+                    else if (daysUntilDue === 3) priority += 80;  // 3 days
+                    else if (daysUntilDue <= 7) priority += 70;   // This week
+                    else if (daysUntilDue <= 14) priority += 50;  // Next 2 weeks
+                    else if (daysUntilDue <= 30) priority += 30;  // This month
+                    else if (daysUntilDue <= 90) priority += 15;  // Next 3 months
+                    else priority += 5;  // Far future
                 } else {
-                    priority += 15;
+                    priority += 10;  // No date = lower priority
                 }
                 
                 const taskLower = taskText.toLowerCase();
@@ -661,36 +664,41 @@
                 
                 let keywordScore = 0;
                 urgentKeywords.forEach(keyword => {
-                    if (taskLower.includes(keyword)) keywordScore += 30;
+                    if (taskLower.includes(keyword)) keywordScore += 20;
                 });
                 
                 if (keywordScore === 0) {
                     highPriorityKeywords.forEach(keyword => {
-                        if (taskLower.includes(keyword)) keywordScore += 15;
+                        if (taskLower.includes(keyword)) keywordScore += 10;
                     });
                 }
                 
-                priority += Math.min(keywordScore, 30);
+                priority += keywordScore;
                 
-                if (taskText.length < 20) priority += 10;
-                else if (taskText.length < 40) priority += 5;
+                // Small bonus for shorter tasks
+                if (taskText.length < 20) priority += 3;
+                else if (taskText.length < 40) priority += 1;
                 
-                return Math.min(priority, 100);
+                return Math.min(priority, 150);  // Cap at 150
             };
 
             const recalculateTaskPriority = (task) => {
                 // Calculate base priority for main task
                 const mainPriority = calculatePriority(task.text, task.dueDate);
                 
-                // If task has subtasks, consider the highest priority subtask
+                // If task has subtasks, find the HIGHEST priority among uncompleted subtasks
                 if (task.subtasks && task.subtasks.length > 0) {
-                    const subtaskPriorities = task.subtasks
-                        .filter(st => !st.completed)
-                        .map(st => calculatePriority(st.text, st.dueDate));
+                    const activeSubtasks = task.subtasks.filter(st => !st.completed);
                     
-                    if (subtaskPriorities.length > 0) {
+                    if (activeSubtasks.length > 0) {
+                        const subtaskPriorities = activeSubtasks.map(st => 
+                            calculatePriority(st.text, st.dueDate)
+                        );
+                        
                         const maxSubtaskPriority = Math.max(...subtaskPriorities);
-                        // Use the higher priority between main task and subtasks
+                        
+                        // IMPORTANT: Use the HIGHER priority between main task and subtasks
+                        // This ensures urgent subtasks bubble up the parent task
                         return Math.max(mainPriority, maxSubtaskPriority);
                     }
                 }
@@ -698,7 +706,7 @@
                 return mainPriority;
             };
 
-            // Load tasks from Firebase
+            // Load tasks from Firebase and recalculate priorities
             useEffect(() => {
                 if (!db) return;
 
@@ -706,16 +714,34 @@
                     .where('username', '==', username)
                     .onSnapshot(snapshot => {
                         const tasksData = [];
+                        
                         snapshot.forEach(doc => {
                             const data = doc.data();
-                            const recalculatedPriority = recalculateTaskPriority(data);
+                            
+                            // Recalculate priorities for all subtasks
+                            const updatedSubtasks = (data.subtasks || []).map(st => ({
+                                ...st,
+                                priority: calculatePriority(st.text, st.dueDate)
+                            }));
+                            
+                            // Recalculate main task priority considering subtasks
+                            const taskWithUpdatedSubtasks = {
+                                ...data,
+                                subtasks: updatedSubtasks
+                            };
+                            
+                            const finalPriority = recalculateTaskPriority(taskWithUpdatedSubtasks);
+                            
                             tasksData.push({ 
                                 id: doc.id, 
-                                ...data,
-                                priority: recalculatedPriority
+                                ...taskWithUpdatedSubtasks,
+                                priority: finalPriority
                             });
                         });
+                        
+                        // Sort by priority (highest first)
                         tasksData.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+                        
                         setTasks(tasksData);
                     });
 
@@ -964,32 +990,32 @@
             };
 
             const getPriorityBorderColor = (priority) => {
-                if (priority >= 70) return '#dc2626';
-                if (priority >= 55) return '#ef4444';
-                if (priority >= 40) return '#f87171';
-                if (priority >= 30) return '#fb7185';
-                if (priority >= 20) return '#f472b6';
-                if (priority >= 10) return '#e879f9';
-                return '#f0abfc';
+                if (priority >= 90) return '#dc2626';  // Extreme urgency
+                if (priority >= 75) return '#ef4444';  // Very high
+                if (priority >= 60) return '#f87171';  // High
+                if (priority >= 45) return '#fb7185';  // Medium-high
+                if (priority >= 30) return '#f472b6';  // Medium
+                if (priority >= 15) return '#e879f9';  // Low
+                return '#f0abfc';  // Very low
             };
 
             const getPriorityColor = (priority) => {
-                if (priority >= 70) return 'bg-red-50';
-                if (priority >= 55) return 'bg-red-50';
-                if (priority >= 40) return 'bg-rose-50';
-                if (priority >= 30) return 'bg-rose-50';
-                if (priority >= 20) return 'bg-pink-50';
-                if (priority >= 10) return 'bg-fuchsia-50';
+                if (priority >= 90) return 'bg-red-50';
+                if (priority >= 75) return 'bg-red-50';
+                if (priority >= 60) return 'bg-rose-50';
+                if (priority >= 45) return 'bg-rose-50';
+                if (priority >= 30) return 'bg-pink-50';
+                if (priority >= 15) return 'bg-fuchsia-50';
                 return 'bg-purple-50';
             };
 
             const getPriorityLabel = (priority) => {
-                if (priority >= 70) return '🔥 Critical';
-                if (priority >= 55) return '⚠️ Very High';
-                if (priority >= 40) return '⭐ High';
-                if (priority >= 30) return '💫 Medium-High';
-                if (priority >= 20) return '🌸 Medium';
-                if (priority >= 10) return '✨ Low';
+                if (priority >= 90) return '🔥 Critical';
+                if (priority >= 75) return '⚠️ Very High';
+                if (priority >= 60) return '⭐ High';
+                if (priority >= 45) return '💫 Medium-High';
+                if (priority >= 30) return '🌸 Medium';
+                if (priority >= 15) return '✨ Low';
                 return '🌙 Very Low';
             };
 
