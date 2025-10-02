@@ -3,712 +3,1199 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>✨ Kawaii Task Manager</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#FFB6C1">
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>Kawaii Cat Task Manager 🐱</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#a855f7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Cat Tasks">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
     
-    <!-- Firebase SDKs -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     
     <style>
-        * {
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+        
+        body {
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
+            font-family: 'Nunito', sans-serif;
+        }
+        
+        .cat-bounce {
+            animation: bounce 2s ease-in-out infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .paw-print {
+            opacity: 0.1;
+            position: absolute;
+            font-size: 24px;
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0); }
+            to { opacity: 0.1; transform: scale(1); }
+        }
+        
+        .sparkle {
+            animation: sparkle 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes sparkle {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
         }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-            position: relative;
-            overflow-x: hidden;
+        .priority-border {
+            transition: border-color 0.3s ease;
         }
 
-        /* Floating hearts animation */
-        .heart {
+        .subtask-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .subtask-list.open {
+            max-height: 500px;
+        }
+
+        .collapse-button {
+            transition: transform 0.3s ease;
+        }
+
+        .collapse-button.open {
+            transform: rotate(180deg);
+        }
+
+        .celebration-overlay {
             position: fixed;
-            font-size: 20px;
-            animation: float 4s ease-in-out infinite;
-            pointer-events: none;
-            z-index: 1;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { transform: translateY(-100vh) rotate(360deg); opacity: 0; }
-        }
-
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            position: relative;
-            z-index: 2;
-        }
-
-        h1 {
-            text-align: center;
-            color: #764ba2;
-            margin-bottom: 10px;
-            font-size: 2em;
-        }
-
-        .subtitle {
-            text-align: center;
-            color: #999;
-            margin-bottom: 30px;
-            font-size: 0.9em;
-        }
-
-        .auth-section {
-            margin-bottom: 30px;
-        }
-
-        .auth-section input {
+            top: 0;
+            left: 0;
             width: 100%;
-            padding: 12px;
-            margin: 8px 0;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-
-        .auth-section input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .auth-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .auth-buttons button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn-signup {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-login {
-            background: #f0f0f0;
-            color: #333;
-        }
-
-        .btn-signup:hover, .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-
-        .user-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 10px;
-            color: white;
-            margin-bottom: 20px;
-        }
-
-        .btn-logout {
-            background: white;
-            color: #764ba2;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.3s;
-        }
-
-        .btn-logout:hover {
-            transform: scale(1.05);
-        }
-
-        .task-input-section {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        #taskInput {
-            flex: 1;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 16px;
-        }
-
-        #taskInput:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        #addTaskBtn {
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        #addTaskBtn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-
-        .task-item {
-            background: #f8f9fa;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 10px;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3);
             display: flex;
             align-items: center;
-            gap: 10px;
-            transition: all 0.3s;
-            position: relative;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeInOverlay 0.3s ease-in;
         }
 
-        .task-item:hover {
-            transform: translateX(5px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        @keyframes fadeInOverlay {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
-        .task-item.completed {
-            opacity: 0.6;
-            background: #e8f5e9;
-        }
-
-        .task-checkbox {
-            width: 24px;
-            height: 24px;
-            cursor: pointer;
-        }
-
-        .task-text {
-            flex: 1;
-            font-size: 16px;
-            word-break: break-word;
-        }
-
-        .task-text.completed {
-            text-decoration: line-through;
-            color: #999;
-        }
-
-        .task-text.editing {
+        .celebration-box {
             background: white;
-            border: 2px solid #667eea;
-            padding: 8px;
-            border-radius: 8px;
-            outline: none;
+            padding: 3rem;
+            border-radius: 2rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
 
-        .task-actions {
+        @keyframes popIn {
+            0% {
+                transform: scale(0) rotate(-180deg);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        .yay-text {
+            font-size: 4rem;
+            font-weight: 900;
+            background: linear-gradient(45deg, #ec4899, #a855f7, #3b82f6);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: rainbow 2s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        @keyframes rainbow {
+            0% { filter: hue-rotate(0deg); }
+            100% { filter: hue-rotate(360deg); }
+        }
+
+        .dancing-cats {
             display: flex;
-            gap: 8px;
+            justify-content: center;
+            gap: 1rem;
+            font-size: 4rem;
+            margin: 1rem 0;
         }
 
-        .btn-edit, .btn-save, .btn-cancel, .btn-delete {
-            padding: 6px 12px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
+        .dancing-cat {
+            animation: dance 0.6s ease-in-out infinite;
+        }
+
+        .dancing-cat:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .dancing-cat:nth-child(2) {
+            animation-delay: 0.15s;
+        }
+
+        .dancing-cat:nth-child(3) {
+            animation-delay: 0.3s;
+        }
+
+        @keyframes dance {
+            0%, 100% {
+                transform: translateY(0) rotate(0deg) scale(1);
+            }
+            25% {
+                transform: translateY(-20px) rotate(-10deg) scale(1.1);
+            }
+            50% {
+                transform: translateY(0) rotate(0deg) scale(1);
+            }
+            75% {
+                transform: translateY(-20px) rotate(10deg) scale(1.1);
+            }
+        }
+
+        .confetti {
+            position: absolute;
+            font-size: 2rem;
+            animation: confettiFall 3s linear;
+        }
+
+        @keyframes confettiFall {
+            0% {
+                transform: translateY(-100px) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        .celebration-message {
+            font-size: 1.5rem;
             font-weight: bold;
-            transition: all 0.3s;
-        }
-
-        .btn-edit {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .btn-save {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .btn-cancel {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .btn-delete {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .btn-edit:hover, .btn-save:hover, .btn-cancel:hover, .btn-delete:hover {
-            transform: scale(1.05);
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        .error-message {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            text-align: center;
-        }
-
-        .success-message {
-            background: #d4edda;
-            color: #155724;
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            text-align: center;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #999;
-        }
-
-        .empty-state-emoji {
-            font-size: 48px;
-            margin-bottom: 10px;
-        }
-
-        @media (max-width: 600px) {
-            .container {
-                padding: 20px;
-            }
-            
-            h1 {
-                font-size: 1.5em;
-            }
-            
-            .task-input-section {
-                flex-direction: column;
-            }
-            
-            #addTaskBtn {
-                width: 100%;
-            }
+            color: #6b7280;
+            margin-top: 1rem;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>✨ Kawaii Task Manager</h1>
-        <p class="subtitle">Stay organized, stay kawaii! 🌸</p>
-        
-        <div id="messageContainer"></div>
-        
-        <!-- Auth Section -->
-        <div id="authSection" class="auth-section">
-            <input type="text" id="usernameInput" placeholder="Username" autocomplete="username">
-            <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password">
-            <div class="auth-buttons">
-                <button class="btn-signup" onclick="signup()">Sign Up 🌟</button>
-                <button class="btn-login" onclick="login()">Login 💖</button>
-            </div>
-        </div>
-        
-        <!-- User Info Section -->
-        <div id="userSection" class="hidden">
-            <div class="user-info">
-                <span>Welcome, <strong id="currentUsername"></strong>! 🎀</span>
-                <button class="btn-logout" onclick="logout()">Logout</button>
-            </div>
-            
-            <!-- Task Input -->
-            <div class="task-input-section">
-                <input type="text" id="taskInput" placeholder="Add a new task... ✨" onkeypress="if(event.key==='Enter') addTask()">
-                <button id="addTaskBtn" onclick="addTask()">Add ➕</button>
-            </div>
-            
-            <!-- Tasks List -->
-            <div id="tasksList"></div>
-            
-            <!-- Empty State -->
-            <div id="emptyState" class="empty-state hidden">
-                <div class="empty-state-emoji">🌸</div>
-                <p>No tasks yet! Add one above to get started~ 💕</p>
-            </div>
-        </div>
-    </div>
+    <div id="root"></div>
 
-    <script>
-        // Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyDMfj9uF9uuLxO0JCqhDO7rEbAKqYdY5r8",
-            authDomain: "kawaii-task-manager.firebaseapp.com",
-            projectId: "kawaii-task-manager",
-            storageBucket: "kawaii-task-manager.firebasestorage.app",
-            messagingSenderId: "488991916932",
-            appId: "1:488991916932:web:aeca8caf571cfed5eeb75f"
-        };
+    <script type="text/babel">
+        const { useState, useEffect } = React;
 
-        let db;
-        let currentUser = null;
-        let firebaseError = null;
+        // 🔥 REPLACE THIS WITH YOUR FIREBASE CONFIG
+       const firebaseConfig = {
+  apiKey: "AIzaSyDC6-FAGsBrCWZ6yiKM3O-7G7m6LwWhdDk",
+  authDomain: "nekodo-dc4e5.firebaseapp.com",
+  projectId: "nekodo-dc4e5",
+  storageBucket: "nekodo-dc4e5.firebasestorage.app",
+  messagingSenderId: "735058315811",
+  appId: "1:735058315811:web:55274dd5c2d70f789a7f96"
+};
 
         // Initialize Firebase
+        let db = null;
         try {
             if (!firebase.apps.length) {
                 firebase.initializeApp(firebaseConfig);
             }
             db = firebase.firestore();
-            console.log('✅ Firebase initialized successfully!');
         } catch (error) {
-            firebaseError = `Firebase initialization error: ${error.message}`;
-            console.error('❌ Firebase Error:', error);
+            console.log("Firebase not configured yet");
         }
 
-        // Create floating hearts
-        function createHeart() {
-            const heart = document.createElement('div');
-            heart.className = 'heart';
-            heart.innerHTML = ['💕', '💖', '💗', '💝', '🌸', '🌺', '🎀'][Math.floor(Math.random() * 7)];
-            heart.style.left = Math.random() * 100 + 'vw';
-            heart.style.animationDuration = (Math.random() * 3 + 3) + 's';
-            heart.style.animationDelay = Math.random() * 2 + 's';
-            document.body.appendChild(heart);
-            setTimeout(() => heart.remove(), 7000);
-        }
-
-        setInterval(createHeart, 2000);
-
-        // Show message
-        function showMessage(message, type = 'error') {
-            const container = document.getElementById('messageContainer');
-            const div = document.createElement('div');
-            div.className = type === 'error' ? 'error-message' : 'success-message';
-            div.textContent = message;
-            container.appendChild(div);
-            setTimeout(() => div.remove(), 3000);
-        }
-
-        // Hash password (simple hash for demo)
-        async function hashPassword(password) {
-            const msgBuffer = new TextEncoder().encode(password);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-
-        // Sign up
-        async function signup() {
-            const username = document.getElementById('usernameInput').value.trim();
-            const password = document.getElementById('passwordInput').value;
-
-            if (!username || !password) {
-                showMessage('Please enter both username and password! 🙏', 'error');
-                return;
-            }
-
-            if (username.length < 3) {
-                showMessage('Username must be at least 3 characters! 📝', 'error');
-                return;
-            }
-
-            if (password.length < 6) {
-                showMessage('Password must be at least 6 characters! 🔒', 'error');
-                return;
-            }
-
-            try {
-                const userDoc = await db.collection('users').doc(username).get();
-                if (userDoc.exists) {
-                    showMessage('Username already exists! Try logging in~ 💫', 'error');
-                    return;
+        // Safe localStorage helper
+        const safeLocalStorage = {
+            getItem: (key) => {
+                try {
+                    return localStorage.getItem(key);
+                } catch (e) {
+                    return null;
                 }
-
-                const passwordHash = await hashPassword(password);
-                await db.collection('users').doc(username).set({
-                    username: username,
-                    passwordHash: passwordHash,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-
-                showMessage('Account created successfully! 🎉', 'success');
-                setTimeout(() => login(), 1000);
-            } catch (error) {
-                console.error('Signup error:', error);
-                showMessage('Signup failed: ' + error.message, 'error');
-            }
-        }
-
-        // Login
-        async function login() {
-            const username = document.getElementById('usernameInput').value.trim();
-            const password = document.getElementById('passwordInput').value;
-
-            if (!username || !password) {
-                showMessage('Please enter both username and password! 🙏', 'error');
-                return;
-            }
-
-            try {
-                const userDoc = await db.collection('users').doc(username).get();
-                if (!userDoc.exists) {
-                    showMessage('User not found! Please sign up first~ 🌟', 'error');
-                    return;
+            },
+            setItem: (key, value) => {
+                try {
+                    localStorage.setItem(key, value);
+                } catch (e) {
+                    // Silently fail
                 }
-
-                const passwordHash = await hashPassword(password);
-                const userData = userDoc.data();
-
-                if (userData.passwordHash !== passwordHash) {
-                    showMessage('Incorrect password! Try again~ 🔐', 'error');
-                    return;
+            },
+            removeItem: (key) => {
+                try {
+                    localStorage.removeItem(key);
+                } catch (e) {
+                    // Silently fail
                 }
-
-                currentUser = username;
-                localStorage.setItem('currentUser', username);
-                showMessage('Welcome back! 💖', 'success');
-                showUserSection();
-                loadTasks();
-            } catch (error) {
-                console.error('Login error:', error);
-                showMessage('Login failed: ' + error.message, 'error');
-            }
-        }
-
-        // Logout
-        function logout() {
-            currentUser = null;
-            localStorage.removeItem('currentUser');
-            document.getElementById('authSection').classList.remove('hidden');
-            document.getElementById('userSection').classList.add('hidden');
-            document.getElementById('usernameInput').value = '';
-            document.getElementById('passwordInput').value = '';
-            showMessage('Logged out successfully! See you soon~ 👋', 'success');
-        }
-
-        // Show user section
-        function showUserSection() {
-            document.getElementById('authSection').classList.add('hidden');
-            document.getElementById('userSection').classList.remove('hidden');
-            document.getElementById('currentUsername').textContent = currentUser;
-        }
-
-        // Add task
-        async function addTask() {
-            const input = document.getElementById('taskInput');
-            const taskText = input.value.trim();
-
-            if (!taskText) {
-                showMessage('Please enter a task! ✍️', 'error');
-                return;
-            }
-
-            try {
-                await db.collection('tasks').add({
-                    text: taskText,
-                    completed: false,
-                    username: currentUser,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    score: calculateScore(taskText)
-                });
-
-                input.value = '';
-                showMessage('Task added! 🎀', 'success');
-                loadTasks();
-            } catch (error) {
-                console.error('Add task error:', error);
-                showMessage('Failed to add task: ' + error.message, 'error');
-            }
-        }
-
-        // Calculate priority score (hidden from user)
-        function calculateScore(text) {
-            let score = 0;
-            const urgentWords = ['urgent', 'asap', 'important', 'critical', 'now', '!!!', 'emergency'];
-            const lowercaseText = text.toLowerCase();
-            
-            urgentWords.forEach(word => {
-                if (lowercaseText.includes(word)) score += 10;
-            });
-            
-            if (text.includes('!')) score += text.split('!').length - 1;
-            
-            return score;
-        }
-
-        // Load tasks
-        async function loadTasks() {
-            try {
-                const snapshot = await db.collection('tasks')
-                    .where('username', '==', currentUser)
-                    .orderBy('createdAt', 'desc')
-                    .get();
-
-                const tasksList = document.getElementById('tasksList');
-                const emptyState = document.getElementById('emptyState');
-                tasksList.innerHTML = '';
-
-                if (snapshot.empty) {
-                    emptyState.classList.remove('hidden');
-                    return;
-                }
-
-                emptyState.classList.add('hidden');
-
-                snapshot.forEach(doc => {
-                    const task = doc.data();
-                    const taskElement = createTaskElement(doc.id, task);
-                    tasksList.appendChild(taskElement);
-                });
-            } catch (error) {
-                console.error('Load tasks error:', error);
-                showMessage('Failed to load tasks: ' + error.message, 'error');
-            }
-        }
-
-        // Create task element
-        function createTaskElement(id, task) {
-            const div = document.createElement('div');
-            div.className = 'task-item' + (task.completed ? ' completed' : '');
-            div.id = `task-${id}`;
-
-            div.innerHTML = `
-                <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''} 
-                       onchange="toggleTask('${id}', this.checked)">
-                <span class="task-text ${task.completed ? 'completed' : ''}" id="text-${id}">${task.text}</span>
-                <div class="task-actions">
-                    <button class="btn-edit" onclick="editTask('${id}')">Edit ✏️</button>
-                    <button class="btn-delete" onclick="deleteTask('${id}')">Delete 🗑️</button>
-                </div>
-            `;
-
-            return div;
-        }
-
-        // Edit task
-        function editTask(id) {
-            const textElement = document.getElementById(`text-${id}`);
-            const originalText = textElement.textContent;
-            const taskElement = document.getElementById(`task-${id}`);
-            
-            // Create input field
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = originalText;
-            input.className = 'task-text editing';
-            input.style.flex = '1';
-            
-            // Replace text with input
-            textElement.replaceWith(input);
-            input.focus();
-            input.select();
-            
-            // Update buttons
-            const actionsDiv = taskElement.querySelector('.task-actions');
-            actionsDiv.innerHTML = `
-                <button class="btn-save" onclick="saveTask('${id}')">Save ✓</button>
-                <button class="btn-cancel" onclick="cancelEdit('${id}', '${originalText.replace(/'/g, "\\'")}')">Cancel ✗</button>
-            `;
-            
-            // Save on Enter key
-            input.onkeypress = (e) => {
-                if (e.key === 'Enter') saveTask(id);
-                if (e.key === 'Escape') cancelEdit(id, originalText);
-            };
-        }
-
-        // Save edited task
-        async function saveTask(id) {
-            const input = document.querySelector(`#task-${id} input.editing`);
-            const newText = input.value.trim();
-            
-            if (!newText) {
-                showMessage('Task cannot be empty! ✍️', 'error');
-                return;
-            }
-            
-            try {
-                await db.collection('tasks').doc(id).update({
-                    text: newText,
-                    score: calculateScore(newText)
-                });
-                
-                showMessage('Task updated! 💫', 'success');
-                loadTasks();
-            } catch (error) {
-                console.error('Save task error:', error);
-                showMessage('Failed to save task: ' + error.message, 'error');
-            }
-        }
-
-        // Cancel editing
-        function cancelEdit(id, originalText) {
-            loadTasks(); // Reload to restore original state
-        }
-
-        // Toggle task completion
-        async function toggleTask(id, completed) {
-            try {
-                await db.collection('tasks').doc(id).update({
-                    completed: completed
-                });
-                loadTasks();
-            } catch (error) {
-                console.error('Toggle task error:', error);
-                showMessage('Failed to update task: ' + error.message, 'error');
-            }
-        }
-
-        // Delete task
-        async function deleteTask(id) {
-            if (!confirm('Are you sure you want to delete this task? 🗑️')) {
-                return;
-            }
-
-            try {
-                await db.collection('tasks').doc(id).delete();
-                showMessage('Task deleted! 🌟', 'success');
-                loadTasks();
-            } catch (error) {
-                console.error('Delete task error:', error);
-                showMessage('Failed to delete task: ' + error.message, 'error');
-            }
-        }
-
-        // Check for saved session on load
-        window.onload = function() {
-            const savedUser = localStorage.getItem('currentUser');
-            if (savedUser) {
-                currentUser = savedUser;
-                showUserSection();
-                loadTasks();
             }
         };
+
+        // Simple hash function for passwords (NOT secure for production!)
+        const simpleHash = (str) => {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            return hash.toString(36);
+        };
+
+        // Celebration Component
+        function Celebration({ onClose }) {
+            const [confetti, setConfetti] = useState([]);
+
+            useEffect(() => {
+                const confettiEmojis = ['✨', '🎉', '🎊', '⭐', '💫', '🌟', '🎈', '🎀', '💖', '🐾'];
+                const newConfetti = [];
+                
+                for (let i = 0; i < 30; i++) {
+                    newConfetti.push({
+                        id: i,
+                        emoji: confettiEmojis[Math.floor(Math.random() * confettiEmojis.length)],
+                        left: Math.random() * 100,
+                        delay: Math.random() * 2
+                    });
+                }
+                
+                setConfetti(newConfetti);
+
+                const timer = setTimeout(() => {
+                    onClose();
+                }, 3000);
+
+                return () => clearTimeout(timer);
+            }, [onClose]);
+
+            return (
+                <div className="celebration-overlay" onClick={onClose}>
+                    {confetti.map(c => (
+                        <div
+                            key={c.id}
+                            className="confetti"
+                            style={{
+                                left: `${c.left}%`,
+                                animationDelay: `${c.delay}s`
+                            }}
+                        >
+                            {c.emoji}
+                        </div>
+                    ))}
+                    
+                    <div className="celebration-box" onClick={(e) => e.stopPropagation()}>
+                        <div className="yay-text">Yay!</div>
+                        
+                        <div className="dancing-cats">
+                            <div className="dancing-cat">😸</div>
+                            <div className="dancing-cat">🎉</div>
+                            <div className="dancing-cat">😺</div>
+                        </div>
+                        
+                        <div className="celebration-message">
+                            Task completed! 🌟
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Login/Signup Component
+        function LoginScreen({ onLogin }) {
+            const [isLogin, setIsLogin] = useState(true);
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError('');
+                
+                if (!username.trim() || !password.trim()) {
+                    setError('Please enter both username and password');
+                    return;
+                }
+
+                if (username.length < 3) {
+                    setError('Username must be at least 3 characters');
+                    return;
+                }
+
+                if (password.length < 4) {
+                    setError('Password must be at least 4 characters');
+                    return;
+                }
+
+                if (!db) {
+                    setError('Firebase not configured. Please check your setup.');
+                    return;
+                }
+
+                setLoading(true);
+
+                try {
+                    const usernameLower = username.toLowerCase().trim();
+                    const passwordHash = simpleHash(password);
+
+                    // Check if user exists
+                    const userDoc = await db.collection('users').doc(usernameLower).get();
+
+                    if (isLogin) {
+                        // LOGIN
+                        if (!userDoc.exists) {
+                            setError('Username not found. Please sign up first!');
+                            setLoading(false);
+                            return;
+                        }
+
+                        const userData = userDoc.data();
+                        if (userData.passwordHash !== passwordHash) {
+                            setError('Incorrect password');
+                            setLoading(false);
+                            return;
+                        }
+
+                        // Login successful!
+                        safeLocalStorage.setItem('currentUser', usernameLower);
+                        safeLocalStorage.setItem('userSession', passwordHash);
+                        onLogin(usernameLower);
+                    } else {
+                        // SIGNUP
+                        if (userDoc.exists) {
+                            setError('Username already taken. Please choose another one!');
+                            setLoading(false);
+                            return;
+                        }
+
+                        // Create new user
+                        await db.collection('users').doc(usernameLower).set({
+                            username: usernameLower,
+                            passwordHash: passwordHash,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
+                        // Auto-login after signup
+                        safeLocalStorage.setItem('currentUser', usernameLower);
+                        safeLocalStorage.setItem('userSession', passwordHash);
+                        onLogin(usernameLower);
+                    }
+                } catch (error) {
+                    console.error('Auth error:', error);
+                    setError('Something went wrong. Please try again.');
+                }
+
+                setLoading(false);
+            };
+
+            return (
+                <div className="min-h-screen p-4 flex items-center justify-center relative overflow-hidden" style={{background: 'linear-gradient(135deg, #e9d5ff 0%, #ddd6fe 50%, #c7d2fe 100%)'}}>
+                    {/* Floating paw prints */}
+                    <div className="paw-print" style={{top: '10%', left: '5%'}}>🐾</div>
+                    <div className="paw-print" style={{top: '20%', right: '10%'}}>🐾</div>
+                    <div className="paw-print" style={{bottom: '15%', left: '15%'}}>🐾</div>
+                    <div className="paw-print" style={{bottom: '25%', right: '5%'}}>🐾</div>
+
+                    <div className="w-full max-w-md">
+                        <div className="bg-white rounded-3xl shadow-2xl p-8 relative overflow-hidden">
+                            {/* Decorative cat */}
+                            <div className="absolute top-0 right-0 text-6xl cat-bounce opacity-20">
+                                🐱
+                            </div>
+
+                            {/* Header */}
+                            <div className="text-center mb-8">
+                                <div className="text-7xl mb-4 cat-bounce">😺</div>
+                                <h1 className="text-4xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent mb-2">
+                                    Kawaii Tasks
+                                </h1>
+                                <p className="text-gray-600 text-lg">
+                                    {isLogin ? 'Welcome back! 🌟' : 'Join the fun! ✨'}
+                                </p>
+                            </div>
+
+                            {/* Form */}
+                            <form onSubmit={handleSubmit} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                                        Username
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
+                                        placeholder="Choose a cool username"
+                                        className="w-full px-4 py-3 border-3 border-purple-300 rounded-2xl focus:outline-none focus:border-pink-400 text-lg font-semibold"
+                                        disabled={loading}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                                        Password
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder="Enter password"
+                                        className="w-full px-4 py-3 border-3 border-purple-300 rounded-2xl focus:outline-none focus:border-pink-400 text-lg font-semibold"
+                                        disabled={loading}
+                                    />
+                                </div>
+
+                                {error && (
+                                    <div className="bg-red-100 border-2 border-red-400 text-red-700 px-4 py-3 rounded-2xl text-sm font-semibold">
+                                        {error}
+                                    </div>
+                                )}
+
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full py-4 bg-gradient-to-r from-pink-400 to-purple-500 text-white rounded-2xl hover:from-pink-500 hover:to-purple-600 font-bold text-lg shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {loading ? '⏳ Loading...' : (isLogin ? '🎯 Login' : '✨ Sign Up')}
+                                </button>
+                            </form>
+
+                            {/* Toggle Login/Signup */}
+                            <div className="mt-6 text-center">
+                                <button
+                                    onClick={() => {
+                                        setIsLogin(!isLogin);
+                                        setError('');
+                                    }}
+                                    className="text-purple-600 hover:text-pink-600 font-bold"
+                                    disabled={loading}
+                                >
+                                    {isLogin ? "Don't have an account? Sign up! 🎉" : 'Already have an account? Login! 👋'}
+                                </button>
+                            </div>
+
+                            {/* Info */}
+                            <div className="mt-6 bg-purple-50 rounded-2xl p-4">
+                                <p className="text-xs text-gray-600 text-center">
+                                    <strong>💡 Tip:</strong> Your username is your unique ID. You can access your tasks from any device by logging in!
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Main Task Manager Component
+        function TaskManager({ username, onLogout }) {
+            const [tasks, setTasks] = useState([]);
+            const [newTask, setNewTask] = useState('');
+            const [newDueDate, setNewDueDate] = useState('');
+            const [showCompleted, setShowCompleted] = useState(false);
+            const [syncing, setSyncing] = useState(false);
+            const [catMood, setCatMood] = useState('happy');
+            const [expandedTasks, setExpandedTasks] = useState({});
+            const [addingSubtaskTo, setAddingSubtaskTo] = useState(null);
+            const [newSubtask, setNewSubtask] = useState('');
+            const [showCelebration, setShowCelebration] = useState(false);
+
+            const calculatePriority = (taskText, dueDate) => {
+                let priority = 0;
+                
+                if (dueDate) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const due = new Date(dueDate);
+                    due.setHours(0, 0, 0, 0);
+                    const daysUntilDue = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysUntilDue < 0) priority += 50;
+                    else if (daysUntilDue === 0) priority += 45;
+                    else if (daysUntilDue === 1) priority += 40;
+                    else if (daysUntilDue === 2) priority += 35;
+                    else if (daysUntilDue === 3) priority += 30;
+                    else if (daysUntilDue <= 7) priority += 20;
+                    else if (daysUntilDue <= 14) priority += 10;
+                    else priority += 5;
+                } else {
+                    priority += 15;
+                }
+                
+                const taskLower = taskText.toLowerCase();
+                const urgentKeywords = ['urgent', 'asap', 'emergency', 'critical', 'deadline', 'important'];
+                const highPriorityKeywords = ['meeting', 'call', 'appointment', 'interview', 'presentation', 'exam', 'test'];
+                
+                let keywordScore = 0;
+                urgentKeywords.forEach(keyword => {
+                    if (taskLower.includes(keyword)) keywordScore += 30;
+                });
+                
+                if (keywordScore === 0) {
+                    highPriorityKeywords.forEach(keyword => {
+                        if (taskLower.includes(keyword)) keywordScore += 15;
+                    });
+                }
+                
+                priority += Math.min(keywordScore, 30);
+                
+                if (taskText.length < 20) priority += 10;
+                else if (taskText.length < 40) priority += 5;
+                
+                return Math.min(priority, 100);
+            };
+
+            // Load tasks from Firebase
+            useEffect(() => {
+                if (!db) return;
+
+                const unsubscribe = db.collection('tasks')
+                    .where('username', '==', username)
+                    .onSnapshot(snapshot => {
+                        const tasksData = [];
+                        snapshot.forEach(doc => {
+                            tasksData.push({ id: doc.id, ...doc.data() });
+                        });
+                        tasksData.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+                        setTasks(tasksData);
+                    });
+
+                return () => unsubscribe();
+            }, [username]);
+
+            // Update cat mood
+            useEffect(() => {
+                const activeTasks = tasks.filter(t => !t.completed);
+                const overdueTasks = activeTasks.filter(t => {
+                    if (!t.dueDate) return false;
+                    return new Date(t.dueDate) < new Date();
+                });
+
+                if (activeTasks.length === 0) setCatMood('excited');
+                else if (overdueTasks.length > 0) setCatMood('worried');
+                else if (activeTasks.length > 5) setCatMood('stressed');
+                else setCatMood('happy');
+            }, [tasks]);
+
+            const addTask = async () => {
+                if (!newTask.trim()) return;
+                if (!db) {
+                    alert('Please configure Firebase first!');
+                    return;
+                }
+                
+                setSyncing(true);
+                const priority = calculatePriority(newTask, newDueDate);
+                
+                const task = {
+                    text: newTask,
+                    dueDate: newDueDate,
+                    completed: false,
+                    priority: priority,
+                    username: username,
+                    subtasks: [],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                try {
+                    await db.collection('tasks').add(task);
+                    setNewTask('');
+                    setNewDueDate('');
+                } catch (error) {
+                    console.error('Error adding task:', error);
+                    alert('Error adding task. Please try again.');
+                }
+                setSyncing(false);
+            };
+
+            const addSubtask = async (taskId) => {
+                if (!newSubtask.trim()) return;
+                if (!db) return;
+
+                setSyncing(true);
+                const task = tasks.find(t => t.id === taskId);
+                const subtasks = task.subtasks || [];
+                
+                const newSubtaskObj = {
+                    id: Date.now().toString(),
+                    text: newSubtask,
+                    completed: false
+                };
+
+                try {
+                    await db.collection('tasks').doc(taskId).update({
+                        subtasks: [...subtasks, newSubtaskObj]
+                    });
+                    setNewSubtask('');
+                    setAddingSubtaskTo(null);
+                } catch (error) {
+                    console.error('Error adding subtask:', error);
+                }
+                setSyncing(false);
+            };
+
+            const toggleSubtask = async (taskId, subtaskId) => {
+                if (!db) return;
+                setSyncing(true);
+                
+                const task = tasks.find(t => t.id === taskId);
+                const subtask = task.subtasks.find(st => st.id === subtaskId);
+                const wasCompleted = subtask.completed;
+                
+                const updatedSubtasks = task.subtasks.map(st => 
+                    st.id === subtaskId ? { ...st, completed: !st.completed } : st
+                );
+
+                try {
+                    await db.collection('tasks').doc(taskId).update({
+                        subtasks: updatedSubtasks
+                    });
+                    
+                    if (!wasCompleted) {
+                        setShowCelebration(true);
+                    }
+                } catch (error) {
+                    console.error('Error updating subtask:', error);
+                }
+                setSyncing(false);
+            };
+
+            const deleteSubtask = async (taskId, subtaskId) => {
+                if (!db) return;
+                setSyncing(true);
+                
+                const task = tasks.find(t => t.id === taskId);
+                const updatedSubtasks = task.subtasks.filter(st => st.id !== subtaskId);
+
+                try {
+                    await db.collection('tasks').doc(taskId).update({
+                        subtasks: updatedSubtasks
+                    });
+                } catch (error) {
+                    console.error('Error deleting subtask:', error);
+                }
+                setSyncing(false);
+            };
+
+            const toggleTask = async (id) => {
+                if (!db) return;
+                setSyncing(true);
+                const task = tasks.find(t => t.id === id);
+                const wasCompleted = task.completed;
+                
+                try {
+                    await db.collection('tasks').doc(id).update({
+                        completed: !task.completed
+                    });
+                    
+                    if (!wasCompleted) {
+                        setShowCelebration(true);
+                    }
+                } catch (error) {
+                    console.error('Error updating task:', error);
+                }
+                setSyncing(false);
+            };
+
+            const deleteTask = async (id) => {
+                if (!db) return;
+                setSyncing(true);
+                try {
+                    await db.collection('tasks').doc(id).delete();
+                } catch (error) {
+                    console.error('Error deleting task:', error);
+                }
+                setSyncing(false);
+            };
+
+            const toggleTaskExpansion = (taskId) => {
+                setExpandedTasks(prev => ({
+                    ...prev,
+                    [taskId]: !prev[taskId]
+                }));
+            };
+
+            const handleLogout = () => {
+                if (confirm('Are you sure you want to logout? 🐱')) {
+                    safeLocalStorage.removeItem('currentUser');
+                    safeLocalStorage.removeItem('userSession');
+                    onLogout();
+                }
+            };
+
+            const getPriorityBorderColor = (priority) => {
+                if (priority >= 70) return '#dc2626';
+                if (priority >= 55) return '#ef4444';
+                if (priority >= 40) return '#f87171';
+                if (priority >= 30) return '#fb7185';
+                if (priority >= 20) return '#f472b6';
+                if (priority >= 10) return '#e879f9';
+                return '#f0abfc';
+            };
+
+            const getPriorityColor = (priority) => {
+                if (priority >= 70) return 'bg-red-50';
+                if (priority >= 55) return 'bg-red-50';
+                if (priority >= 40) return 'bg-rose-50';
+                if (priority >= 30) return 'bg-rose-50';
+                if (priority >= 20) return 'bg-pink-50';
+                if (priority >= 10) return 'bg-fuchsia-50';
+                return 'bg-purple-50';
+            };
+
+            const getPriorityLabel = (priority) => {
+                if (priority >= 70) return '🔥 Critical';
+                if (priority >= 55) return '⚠️ Very High';
+                if (priority >= 40) return '⭐ High';
+                if (priority >= 30) return '💫 Medium-High';
+                if (priority >= 20) return '🌸 Medium';
+                if (priority >= 10) return '✨ Low';
+                return '🌙 Very Low';
+            };
+
+            const formatDueDate = (dateString) => {
+                if (!dateString) return '';
+                const date = new Date(dateString);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                date.setHours(0, 0, 0, 0);
+                
+                const diff = Math.ceil((date - today) / (1000 * 60 * 60 * 24));
+                
+                if (diff < 0) return '⚠️ Overdue';
+                if (diff === 0) return '📌 Today';
+                if (diff === 1) return '📅 Tomorrow';
+                if (diff === 2) return '📆 In 2 days';
+                if (diff <= 7) return `📆 In ${diff} days`;
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            };
+
+            const getCatEmoji = () => {
+                switch(catMood) {
+                    case 'excited': return '😸';
+                    case 'worried': return '🙀';
+                    case 'stressed': return '😿';
+                    default: return '😺';
+                }
+            };
+
+            const getCatMessage = () => {
+                switch(catMood) {
+                    case 'excited': return 'Yay! All tasks done! Time to play! 🎉';
+                    case 'worried': return 'Meow! You have overdue tasks! 😰';
+                    case 'stressed': return 'So many tasks... Let\'s tackle them! 💪';
+                    default: return 'Ready to be productive! ✨';
+                }
+            };
+
+            const activeTasks = tasks.filter(t => !t.completed);
+            const completedTasks = tasks.filter(t => t.completed);
+
+            return (
+                <div className="min-h-screen p-4 relative overflow-hidden" style={{background: 'linear-gradient(135deg, #e9d5ff 0%, #ddd6fe 50%, #c7d2fe 100%)'}}>
+                    {showCelebration && (
+                        <Celebration onClose={() => setShowCelebration(false)} />
+                    )}
+
+                    <div className="paw-print" style={{top: '10%', left: '5%'}}>🐾</div>
+                    <div className="paw-print" style={{top: '20%', right: '10%'}}>🐾</div>
+                    <div className="paw-print" style={{bottom: '15%', left: '15%'}}>🐾</div>
+                    <div className="paw-print" style={{bottom: '25%', right: '5%'}}>🐾</div>
+                    
+                    <div className="max-w-2xl mx-auto relative">
+                        <div className="bg-white rounded-3xl shadow-2xl p-6 mb-6 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 text-6xl cat-bounce opacity-20">
+                                🐱
+                            </div>
+                            
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-4 flex-1">
+                                    <div className="text-6xl cat-bounce">{getCatEmoji()}</div>
+                                    <div className="flex-1">
+                                        <h1 className="text-4xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
+                                            Kawaii Task Manager
+                                        </h1>
+                                        <p className="text-lg text-gray-600 mt-1">{getCatMessage()}</p>
+                                        <p className="text-sm text-purple-600 font-semibold mt-1">
+                                            👤 Logged in as: {username}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={handleLogout}
+                                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-sm transition-all"
+                                >
+                                    🚪 Logout
+                                </button>
+                            </div>
+                            
+                            {syncing && (
+                                <div className="mb-4 text-center">
+                                    <span className="text-2xl sparkle inline-block">✨ Syncing...</span>
+                                </div>
+                            )}
+                            
+                            <div className="space-y-3">
+                                <input
+                                    type="text"
+                                    value={newTask}
+                                    onChange={(e) => setNewTask(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && addTask()}
+                                    placeholder="What's on your mind? 🌟"
+                                    className="w-full px-5 py-4 border-3 border-purple-300 rounded-2xl focus:outline-none focus:border-pink-400 text-lg font-semibold shadow-lg"
+                                />
+                                
+                                <div className="flex gap-3">
+                                    <div className="flex-1 relative">
+                                        <span className="absolute left-4 top-4 text-xl">📅</span>
+                                        <input
+                                            type="date"
+                                            value={newDueDate}
+                                            onChange={(e) => setNewDueDate(e.target.value)}
+                                            className="w-full pl-12 pr-5 py-4 border-3 border-purple-300 rounded-2xl focus:outline-none focus:border-pink-400 text-lg font-semibold shadow-lg"
+                                        />
+                                    </div>
+                                    
+                                    <button
+                                        onClick={addTask}
+                                        className="px-8 py-4 bg-gradient-to-r from-pink-400 to-purple-500 text-white rounded-2xl hover:from-pink-500 hover:to-purple-600 font-bold text-lg shadow-lg transform hover:scale-105 transition-all"
+                                    >
+                                        ✨ Add
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-3xl shadow-2xl p-6 mb-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <h2 className="text-2xl font-bold text-gray-800">
+                                    📝 Active Tasks
+                                </h2>
+                                <span className="px-3 py-1 bg-purple-200 text-purple-800 rounded-full font-bold">
+                                    {activeTasks.length}
+                                </span>
+                            </div>
+                            
+                            {activeTasks.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <div className="text-7xl mb-4 cat-bounce">😸</div>
+                                    <p className="text-2xl font-bold text-gray-600">All done! You're amazing! 🎉</p>
+                                    <p className="text-lg text-gray-500 mt-2">Time for some catnip! 🌿</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {activeTasks.map(task => {
+                                        const priority = task.priority || 0;
+                                        const borderColor = getPriorityBorderColor(priority);
+                                        const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+                                        const isExpanded = expandedTasks[task.id];
+                                        const completedSubtasks = task.subtasks?.filter(st => st.completed).length || 0;
+                                        const totalSubtasks = task.subtasks?.length || 0;
+
+                                        return (
+                                            <div
+                                                key={task.id}
+                                                className={`priority-border rounded-2xl p-5 transition-all shadow-md hover:shadow-xl ${getPriorityColor(priority)}`}
+                                                style={{ 
+                                                    borderWidth: '4px',
+                                                    borderStyle: 'solid',
+                                                    borderColor: borderColor
+                                                }}
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <button
+                                                        onClick={() => toggleTask(task.id)}
+                                                        className="mt-1 w-7 h-7 border-3 border-purple-400 rounded-lg hover:border-pink-500 hover:bg-pink-100 flex-shrink-0 transition-all transform hover:scale-110"
+                                                    >
+                                                    </button>
+                                                    
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-gray-800 font-bold text-lg break-words">{task.text}</p>
+                                                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                                                            <span className="px-3 py-1 bg-white rounded-full font-bold text-sm shadow-sm">
+                                                                {getPriorityLabel(priority)}
+                                                            </span>
+                                                            <span className="px-2 py-1 bg-gray-100 rounded-full text-xs font-semibold text-gray-600">
+                                                                Score: {priority}
+                                                            </span>
+                                                            {task.dueDate && (
+                                                                <span className="text-gray-700 font-semibold text-sm">
+                                                                    {formatDueDate(task.dueDate)}
+                                                                </span>
+                                                            )}
+                                                            {hasSubtasks && (
+                                                                <span className="text-gray-600 text-sm font-semibold">
+                                                                    📋 {completedSubtasks}/{totalSubtasks} subtasks
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="mt-3">
+                                                            <div className="flex gap-2">
+                                                                {hasSubtasks && (
+                                                                    <button
+                                                                        onClick={() => toggleTaskExpansion(task.id)}
+                                                                        className="text-sm font-bold text-purple-600 hover:text-pink-600 flex items-center gap-1"
+                                                                    >
+                                                                        <span className={`collapse-button ${isExpanded ? 'open' : ''}`}>▼</span>
+                                                                        {isExpanded ? 'Hide' : 'Show'} subtasks
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => setAddingSubtaskTo(addingSubtaskTo === task.id ? null : task.id)}
+                                                                    className="text-sm font-bold text-purple-600 hover:text-pink-600"
+                                                                >
+                                                                    ➕ Add subtask
+                                                                </button>
+                                                            </div>
+
+                                                            {addingSubtaskTo === task.id && (
+                                                                <div className="flex gap-2 mt-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={newSubtask}
+                                                                        onChange={(e) => setNewSubtask(e.target.value)}
+                                                                        onKeyPress={(e) => e.key === 'Enter' && addSubtask(task.id)}
+                                                                        placeholder="Subtask name..."
+                                                                        className="flex-1 px-3 py-2 border-2 border-purple-300 rounded-lg focus:outline-none focus:border-pink-400 text-sm"
+                                                                        autoFocus
+                                                                    />
+                                                                    <button
+                                                                        onClick={() => addSubtask(task.id)}
+                                                                        className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-pink-500 font-bold text-sm"
+                                                                    >
+                                                                        Add
+                                                                    </button>
+                                                                </div>
+                                                            )}
+
+                                                            <div className={`subtask-list ${isExpanded ? 'open' : ''}`}>
+                                                                {hasSubtasks && (
+                                                                    <div className="mt-3 space-y-2 pl-2 border-l-2 border-purple-200">
+                                                                        {task.subtasks.map(subtask => (
+                                                                            <div key={subtask.id} className="flex items-center gap-2">
+                                                                                <button
+                                                                                    onClick={() => toggleSubtask(task.id, subtask.id)}
+                                                                                    className={`w-5 h-5 border-2 rounded flex-shrink-0 flex items-center justify-center ${
+                                                                                        subtask.completed 
+                                                                                            ? 'bg-green-500 border-green-500' 
+                                                                                            : 'border-purple-300 hover:border-pink-400'
+                                                                                    }`}
+                                                                                >
+                                                                                    {subtask.completed && (
+                                                                                        <span className="text-white text-xs font-bold">✓</span>
+                                                                                    )}
+                                                                                </button>
+                                                                                <span className={`flex-1 text-sm ${subtask.completed ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                                                                                    {subtask.text}
+                                                                                </span>
+                                                                                <button
+                                                                                    onClick={() => deleteSubtask(task.id, subtask.id)}
+                                                                                    className="text-sm hover:scale-110 transition-transform"
+                                                                                >
+                                                                                    🗑️
+                                                                                </button>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <button
+                                                        onClick={() => deleteTask(task.id)}
+                                                        className="text-2xl flex-shrink-0 transform hover:scale-125 transition-all"
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {completedTasks.length > 0 && (
+                            <div className="bg-white rounded-3xl shadow-2xl p-6 overflow-hidden">
+                                <button
+                                    onClick={() => setShowCompleted(!showCompleted)}
+                                    className="w-full flex items-center justify-between mb-4 hover:bg-gray-50 p-2 rounded-xl transition-all"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-2xl font-bold text-gray-800">
+                                            ✅ Completed
+                                        </h2>
+                                        <span className="px-3 py-1 bg-green-200 text-green-800 rounded-full font-bold">
+                                            {completedTasks.length}
+                                        </span>
+                                    </div>
+                                    <span className={`text-2xl transition-transform ${showCompleted ? 'rotate-180' : ''}`}>
+                                        ▼
+                                    </span>
+                                </button>
+                                
+                                <div className={`subtask-list ${showCompleted ? 'open' : ''}`}>
+                                    <div className="space-y-3">
+                                        {completedTasks.map(task => (
+                                            <div
+                                                key={task.id}
+                                                className="border-3 border-gray-300 rounded-2xl p-5 bg-gray-50"
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <button
+                                                        onClick={() => toggleTask(task.id)}
+                                                        className="mt-1 w-7 h-7 border-3 border-green-500 bg-green-500 rounded-lg flex-shrink-0 flex items-center justify-center"
+                                                    >
+                                                        <span className="text-white font-bold">✓</span>
+                                                    </button>
+                                                    
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-gray-500 line-through font-semibold text-lg break-words">{task.text}</p>
+                                                        {task.subtasks && task.subtasks.length > 0 && (
+                                                            <div className="mt-2 space-y-1 pl-2 border-l-2 border-gray-300">
+                                                                {task.subtasks.map(subtask => (
+                                                                    <div key={subtask.id} className="flex items-center gap-2">
+                                                                        <span className={`text-sm ${subtask.completed ? 'line-through text-gray-400' : 'text-gray-500'}`}>
+                                                                            {subtask.completed ? '✓' : '○'} {subtask.text}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    <button
+                                                        onClick={() => deleteTask(task.id)}
+                                                        className="text-2xl flex-shrink-0 transform hover:scale-125 transition-all"
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        
+                        <div className="text-center mt-8 text-4xl cat-bounce">
+                            🐾
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Main App Component
+        function App() {
+            const [currentUser, setCurrentUser] = useState(null);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                // Check if user is already logged in
+                const savedUser = safeLocalStorage.getItem('currentUser');
+                const savedSession = safeLocalStorage.getItem('userSession');
+                
+                if (savedUser && savedSession) {
+                    // Verify session is valid (you could add server-side verification here)
+                    setCurrentUser(savedUser);
+                }
+                
+                setLoading(false);
+            }, []);
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center" style={{background: 'linear-gradient(135deg, #e9d5ff 0%, #ddd6fe 50%, #c7d2fe 100%)'}}>
+                        <div className="text-center">
+                            <div className="text-7xl mb-4 cat-bounce">😺</div>
+                            <p className="text-2xl font-bold text-gray-700">Loading...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (!currentUser) {
+                return <LoginScreen onLogin={setCurrentUser} />;
+            }
+
+            return <TaskManager username={currentUser} onLogout={() => setCurrentUser(null)} />;
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
     </script>
+
+    <!-- PWA Service Worker Registration with Auto-Update -->
+<script>
+    if ('serviceWorker' in navigator) {
+        let refreshing = false;
+        
+        // Detect when new service worker is ready
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            refreshing = true;
+            console.log('🔄 New version available! Reloading...');
+            window.location.reload();
+        });
+
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then((registration) => {
+                    console.log('✨ PWA Service Worker registered!', registration.scope);
+                    
+                    // Check for updates every 30 seconds
+                    setInterval(() => {
+                        console.log('🔍 Checking for updates...');
+                        registration.update();
+                    }, 30000);
+                    
+                    // Listen for updates
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        console.log('📦 New version found! Installing...');
+                        
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // New service worker available, tell user
+                                console.log('✅ New version ready!');
+                                
+                                // Show update notification
+                                if (confirm('🎉 New update available! Reload to get the latest version?')) {
+                                    newWorker.postMessage({ type: 'SKIP_WAITING' });
+                                }
+                            }
+                        });
+                    });
+                })
+                .catch((error) => {
+                    console.log('Service Worker registration failed:', error);
+                });
+        });
+    }
+</script>
 </body>
 </html>
