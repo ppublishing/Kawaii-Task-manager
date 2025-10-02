@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kawaii Cat Task Manager 🐱</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Nunito', sans-serif;
+        }
+        
+        .cat-bounce {
+            animation: bounce 2s ease-in-out infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .paw-print {
+            opacity: 0.1;
+            position: absolute;
+            font-size: 24px;
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0); }
+            to { opacity: 0.1; transform: scale(1); }
+        }
+        
+        .sparkle {
+            animation: sparkle 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes sparkle {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .priority-border {
+            transition: border-color 0.3s ease;
+        }
+
+        .subtask-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .subtask-list.open {
+            max-height: 500px;
+        }
+
+        .collapse-button {
+            transition: transform 0.3s ease;
+        }
+
+        .collapse-button.open {
+            transform: rotate(180deg);
+        }
+
+        /* Celebration Animation Styles */
+        .celebration-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeInOverlay 0.3s ease-in;
+        }
+
+        @keyframes fadeInOverlay {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .celebration-box {
+            background: white;
+            padding: 3rem;
+            border-radius: 2rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        @keyframes popIn {
+            0% {
+                transform: scale(0) rotate(-180deg);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        .yay-text {
+            font-size: 4rem;
+            font-weight: 900;
+            background: linear-gradient(45deg, #ec4899, #a855f7, #3b82f6);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: rainbow 2s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        @keyframes rainbow {
+            0% { filter: hue-rotate(0deg); }
+            100% { filter: hue-rotate(360deg); }
+        }
+
+        .dancing-cats {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            font-size: 4rem;
+            margin: 1rem 0;
+        }
+
+        .dancing-cat {
+            animation: dance 0.6s ease-in-out infinite;
+        }
+
+        .dancing-cat:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .dancing-cat:nth-child(2) {
+            animation-delay: 0.15s;
+        }
+
+        .dancing-cat:nth-child(3) {
+            animation-delay: 0.3s;
+        }
+
+        @keyframes dance {
+            0%, 100% {
+                transform: translateY(0) rotate(0deg) scale(1);
+            }
+            25% {
+                transform: translateY(-20px) rotate(-10deg) scale(1.1);
+            }
+            50% {
+                transform: translateY(0) rotate(0deg) scale(1);
+            }
+            75% {
+                transform: translateY(-20px) rotate(10deg) scale(1.1);
+            }
+        }
+
+        .confetti {
+            position: absolute;
+            font-size: 2rem;
+            animation: confettiFall 3s linear;
+        }
+
+        @keyframes confettiFall {
+            0% {
+                transform: translateY(-100px) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        .celebration-message {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #6b7280;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // 🔥 REPLACE THIS WITH YOUR FIREBASE CONFIG
+        const firebaseConfig = {
+  apiKey: "AIzaSyDC6-FAGsBrCWZ6yiKM3O-7G7m6LwWhdDk",
+  authDomain: "nekodo-dc4e5.firebaseapp.com",
+  projectId: "nekodo-dc4e5",
+  storageBucket: "nekodo-dc4e5.firebasestorage.app",
+  messagingSenderId: "735058315811",
+  appId: "1:735058315811:web:55274dd5c2d70f789a7f96"
+};
+
+        // Initialize Firebase
+        let db = null;
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.firestore();
+        } catch (error) {
+            console.log("Firebase not configured yet");
+        }
+
+        // Safe localStorage helper
+        const safeLocalStorage = {
+            getItem: (key) => {
+                try {
+                    return localStorage.getItem(key);
+                } catch (e) {
+                    return null;
+                }
+            },
+            setItem: (key, value) => {
+                try {
+                    localStorage.setItem(key, value);
+                } catch (e) {
+                    // Silently fail
+                }
+            }
+        };
+
+        // Celebration Component
+        function Celebration({ onClose }) {
+            const [confetti, setConfetti] = useState([]);
+
+            useEffect(() => {
+                // Generate confetti
+                const confettiEmojis = ['✨', '🎉', '🎊', '⭐', '💫', '🌟', '🎈', '🎀', '💖', '🐾'];
+                const newConfetti = [];
+                
+                for (let i = 0; i < 30; i++) {
+                    newConfetti.push({
+                        id: i,
+                        emoji: confettiEmojis[Math.floor(Math.random() * confettiEmojis.length)],
+                        left: Math.random() * 100,
+                        delay: Math.random() * 2
+                    });
+                }
+                
+                setConfetti(newConfetti);
+
+                // Auto close after 3 seconds
+                const timer = setTimeout(() => {
+                    onClose();
+                }, 3000);
+
+                return () => clearTimeout(timer);
+            }, [onClose]);
+
+            return (
+                <div className="celebration-overlay" onClick={onClose}>
+                    {confetti.map(c => (
+                        <div
+                            key={c.id}
+                            className="confetti"
+                            style={{
+                                left: `${c.left}%`,
+                                animationDelay: `${c.delay}s`
+                            }}
+                        >
+                            {c.emoji}
+                        </div>
+                    ))}
+                    
+                    <div className="celebration-box" onClick={(e) => e.stopPropagation()}>
+                        <div className="yay-text">Yay!</div>
+                        
+                        <div className="dancing-cats">
+                            <div className="dancing-cat">😸</div>
+                            <div className="dancing-cat">🎉</div>
+                            <div className="dancing-cat">😺</div>
+                        </div>
+                        
+                        <div className="celebration-message">
+                            Task completed! 🌟
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function TaskManager() {
+            const [tasks, setTasks] = useState([]);
+            const [newTask, setNewTask] = useState('');
+            const [newDueDate, setNewDueDate] = useState('');
+            const [showCompleted, setShowCompleted] = useState(false);
+            const [syncing, setSyncing] = useState(false);
+            const [catMood, setCatMood] = useState('happy');
+            const [expandedTasks, setExpandedTasks] = useState({});
+            const [addingSubtaskTo, setAddingSubtaskTo] = useState(null);
+            const [newSubtask, setNewSubtask] = useState('');
+            const [showCelebration, setShowCelebration] = useState(false);
+            const [userId] = useState(() => {
+                let id = safeLocalStorage.getItem('userId');
+                if (!id) {
+                    id = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    safeLocalStorage.setItem('userId', id);
+                }
+                return id;
+            });
+
+            // Calculate priority for a task
+            const calculatePriority = (taskText, dueDate) => {
+                let priority = 0;
+                
+                // Due date scoring (0-50 points)
+                if (dueDate) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const due = new Date(dueDate);
+                    due.setHours(0, 0, 0, 0);
+                    const daysUntilDue = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysUntilDue < 0) priority += 50; // Overdue - highest
+                    else if (daysUntilDue === 0) priority += 45; // Due today
+                    else if (daysUntilDue === 1) priority += 40; // Due tomorrow
+                    else if (daysUntilDue === 2) priority += 35; // Due in 2 days
+                    else if (daysUntilDue === 3) priority += 30; // Due in 3 days
+                    else if (daysUntilDue <= 7) priority += 20; // Due this week
+                    else if (daysUntilDue <= 14) priority += 10; // Due in 2 weeks
+                    else priority += 5; // Due later
+                } else {
+                    priority += 15; // No due date - medium priority
+                }
+                
+                // Keyword scoring (0-30 points)
+                const taskLower = taskText.toLowerCase();
+                const urgentKeywords = ['urgent', 'asap', 'emergency', 'critical', 'deadline', 'important'];
+                const highPriorityKeywords = ['meeting', 'call', 'appointment', 'interview', 'presentation', 'exam', 'test'];
+                
+                let keywordScore = 0;
+                urgentKeywords.forEach(keyword => {
+                    if (taskLower.includes(keyword)) keywordScore += 30;
+                });
+                
+                if (keywordScore === 0) {
+                    highPriorityKeywords.forEach(keyword => {
+                        if (taskLower.includes(keyword)) keywordScore += 15;
+                    });
+                }
+                
+                priority += Math.min(keywordScore, 30);
+                
+                // Task length bonus (0-10 points) - shorter tasks are slightly more urgent
+                if (taskText.length < 20) priority += 10;
+                else if (taskText.length < 40) priority += 5;
+                
+                return Math.min(priority, 100);
+            };
+
+            // Load tasks from Firebase
+            useEffect(() => {
+                if (!db) return;
+
+                const unsubscribe = db.collection('tasks')
+                    .where('userId', '==', userId)
+                    .onSnapshot(snapshot => {
+                        const tasksData = [];
+                        snapshot.forEach(doc => {
+                            tasksData.push({ id: doc.id, ...doc.data() });
+                        });
+                        // Sort by priority (highest first)
+                        tasksData.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+                        setTasks(tasksData);
+                    });
+
+                return () => unsubscribe();
+            }, [userId]);
+
+            // Update cat mood based on tasks
+            useEffect(() => {
+                const activeTasks = tasks.filter(t => !t.completed);
+                const overdueTasks = activeTasks.filter(t => {
+                    if (!t.dueDate) return false;
+                    return new Date(t.dueDate) < new Date();
+                });
+
+                if (activeTasks.length === 0) setCatMood('excited');
+                else if (overdueTasks.length > 0) setCatMood('worried');
+                else if (activeTasks.length > 5) setCatMood('stressed');
+                else setCatMood('happy');
+            }, [tasks]);
+
+            const addTask = async () => {
+                if (!newTask.trim()) return;
+                if (!db) {
+                    alert('Please configure Firebase first! Replace the firebaseConfig in the HTML file.');
+                    return;
+                }
+                
+                setSyncing(true);
+                const priority = calculatePriority(newTask, newDueDate);
+                
+                const task = {
+                    text: newTask,
+                    dueDate: newDueDate,
+                    completed: false,
+                    priority: priority,
+                    userId: userId,
+                    subtasks: [],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                try {
+                    await db.collection('tasks').add(task);
+                    setNewTask('');
+                    setNewDueDate('');
+                } catch (error) {
+                    console.error('Error adding task:', error);
+                    alert('Error adding task. Make sure Firebase is configured correctly.');
+                }
+                setSyncing(false);
+            };
+
+            const addSubtask = async (taskId) => {
+                if (!newSubtask.trim()) return;
+                if (!db) return;
+
+                setSyncing(true);
+                const task = tasks.find(t => t.id === taskId);
+                const subtasks = task.subtasks || [];
+                
+                const newSubtaskObj = {
+                    id: Date.now().toString(),
+                    text: newSubtask,
+                    completed: false
+                };
+
+                try {
+                    await db.collection('tasks').doc(taskId).update({
+                        subtasks: [...subtasks, newSubtaskObj]
+                    });
+                    setNewSubtask('');
+                    setAddingSubtaskTo(null);
+                } catch (error) {
+                    console.error('Error adding subtask:', error);
+                }
+                setSyncing(false);
+            };
+
+            const toggleSubtask = async (taskId, subtaskId) => {
+                if (!db) return;
+                setSyncing(true);
+                
+                const task = tasks.find(t => t.id === taskId);
+                const subtask = task.subtasks.find(st => st.id === subtaskId);
+                const wasCompleted = subtask.completed;
+                
+                const updatedSubtasks = task.subtasks.map(st => 
+                    st.id === subtaskId ? { ...st, completed: !st.completed } : st
+                );
+
+                try {
+                    await db.collection('tasks').doc(taskId).update({
+                        subtasks: updatedSubtasks
+                    });
+                    
+                    // Show celebration if subtask was just completed
+                    if (!wasCompleted) {
+                        setShowCelebration(true);
+                    }
+                } catch (error) {
+                    console.error('Error updating subtask:', error);
+                }
+                setSyncing(false);
+            };
+
+            const deleteSubtask = async (taskId, subtaskId) => {
+                if (!db) return;
+                setSyncing(true);
+                
+                const task = tasks.find(t => t.id === taskId);
+                const updatedSubtasks = task.subtasks.filter(st => st.id !== subtaskId);
+
+                try {
+                    await db.collection('tasks').doc(taskId).update({
+                        subtasks: updatedSubtasks
+                    });
+                } catch (error) {
+                    console.error('Error deleting subtask:', error);
+                }
+                setSyncing(false);
+            };
+
+            const toggleTask = async (id) => {
+                if (!db) return;
+                setSyncing(true);
+                const task = tasks.find(t => t.id === id);
+                const wasCompleted = task.completed;
+                
+                try {
+                    await db.collection('tasks').doc(id).update({
+                        completed: !task.completed
+                    });
+                    
+                    // Show celebration if task was just completed
+                    if (!wasCompleted) {
+                        setShowCelebration(true);
+                    }
+                } catch (error) {
+                    console.error('Error updating task:', error);
+                }
+                setSyncing(false);
+            };
+
+            const deleteTask = async (id) => {
+                if (!db) return;
+                setSyncing(true);
+                try {
+                    await db.collection('tasks').doc(id).delete();
+                } catch (error) {
+                    console.error('Error deleting task:', error);
+                }
+                setSyncing(false);
+            };
+
+            const toggleTaskExpansion = (taskId) => {
+                setExpandedTasks(prev => ({
+                    ...prev,
+                    [taskId]: !prev[taskId]
+                }));
+            };
+
+            const getPriorityBorderColor = (priority) => {
+                // Red (high priority) to pink (low priority) gradient
+                if (priority >= 70) return '#dc2626'; // red-600 - Critical
+                if (priority >= 55) return '#ef4444'; // red-500 - Very high
+                if (priority >= 40) return '#f87171'; // red-400 - High
+                if (priority >= 30) return '#fb7185'; // rose-400 - Medium-high
+                if (priority >= 20) return '#f472b6'; // pink-400 - Medium
+                if (priority >= 10) return '#e879f9'; // fuchsia-400 - Medium-low
+                return '#f0abfc'; // fuchsia-300 - Low
+            };
+
+            const getPriorityColor = (priority) => {
+                if (priority >= 70) return 'bg-red-50';
+                if (priority >= 55) return 'bg-red-50';
+                if (priority >= 40) return 'bg-rose-50';
+                if (priority >= 30) return 'bg-rose-50';
+                if (priority >= 20) return 'bg-pink-50';
+                if (priority >= 10) return 'bg-fuchsia-50';
+                return 'bg-purple-50';
+            };
+
+            const getPriorityLabel = (priority) => {
+                if (priority >= 70) return '🔥 Critical';
+                if (priority >= 55) return '⚠️ Very High';
+                if (priority >= 40) return '⭐ High';
+                if (priority >= 30) return '💫 Medium-High';
+                if (priority >= 20) return '🌸 Medium';
+                if (priority >= 10) return '✨ Low';
+                return '🌙 Very Low';
+            };
+
+            const formatDueDate = (dateString) => {
+                if (!dateString) return '';
+                const date = new Date(dateString);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                date.setHours(0, 0, 0, 0);
+                
+                const diff = Math.ceil((date - today) / (1000 * 60 * 60 * 24));
+                
+                if (diff < 0) return '⚠️ Overdue';
+                if (diff === 0) return '📌 Today';
+                if (diff === 1) return '📅 Tomorrow';
+                if (diff === 2) return '📆 In 2 days';
+                if (diff <= 7) return `📆 In ${diff} days`;
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            };
+
+            const getCatEmoji = () => {
+                switch(catMood) {
+                    case 'excited': return '😸';
+                    case 'worried': return '🙀';
+                    case 'stressed': return '😿';
+                    default: return '😺';
+                }
+            };
+
+            const getCatMessage = () => {
+                switch(catMood) {
+                    case 'excited': return 'Yay! All tasks done! Time to play! 🎉';
+                    case 'worried': return 'Meow! You have overdue tasks! 😰';
+                    case 'stressed': return 'So many tasks... Let\'s tackle them! 💪';
+                    default: return 'Ready to be productive! ✨';
+                }
+            };
+
+            const activeTasks = tasks.filter(t => !t.completed);
+            const completedTasks = tasks.filter(t => t.completed);
+
+            return (
+                <div className="min-h-screen p-4 relative overflow-hidden" style={{background: 'linear-gradient(135deg, #e9d5ff 0%, #ddd6fe 50%, #c7d2fe 100%)'}}>
+                    {/* Celebration Animation */}
+                    {showCelebration && (
+                        <Celebration onClose={() => setShowCelebration(false)} />
+                    )}
+
+                    {/* Floating paw prints */}
+                    <div className="paw-print" style={{top: '10%', left: '5%'}}>🐾</div>
+                    <div className="paw-print" style={{top: '20%', right: '10%'}}>🐾</div>
+                    <div className="paw-print" style={{bottom: '15%', left: '15%'}}>🐾</div>
+                    <div className="paw-print" style={{bottom: '25%', right: '5%'}}>🐾</div>
+                    
+                    <div className="max-w-2xl mx-auto relative">
+                        {/* Kawaii Cat Header */}
+                        <div className="bg-white rounded-3xl shadow-2xl p-6 mb-6 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 text-6xl cat-bounce opacity-20">
+                                🐱
+                            </div>
+                            
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="text-6xl cat-bounce">{getCatEmoji()}</div>
+                                <div className="flex-1">
+                                    <h1 className="text-4xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
+                                        Kawaii Task Manager
+                                    </h1>
+                                    <p className="text-lg text-gray-600 mt-1">{getCatMessage()}</p>
+                                </div>
+                                {syncing && (
+                                    <div className="text-2xl sparkle">✨</div>
+                                )}
+                            </div>
+                            
+                            <div className="space-y-3">
+                                <input
+                                    type="text"
+                                    value={newTask}
+                                    onChange={(e) => setNewTask(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && addTask()}
+                                    placeholder="What's on your mind? 🌟"
+                                    className="w-full px-5 py-4 border-3 border-purple-300 rounded-2xl focus:outline-none focus:border-pink-400 text-lg font-semibold shadow-lg"
+                                />
+                                
+                                <div className="flex gap-3">
+                                    <div className="flex-1 relative">
+                                        <span className="absolute left-4 top-4 text-xl">📅</span>
+                                        <input
+                                            type="date"
+                                            value={newDueDate}
+                                            onChange={(e) => setNewDueDate(e.target.value)}
+                                            className="w-full pl-12 pr-5 py-4 border-3 border-purple-300 rounded-2xl focus:outline-none focus:border-pink-400 text-lg font-semibold shadow-lg"
+                                        />
+                                    </div>
+                                    
+                                    <button
+                                        onClick={addTask}
+                                        className="px-8 py-4 bg-gradient-to-r from-pink-400 to-purple-500 text-white rounded-2xl hover:from-pink-500 hover:to-purple-600 font-bold text-lg shadow-lg transform hover:scale-105 transition-all"
+                                    >
+                                        ✨ Add
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Active Tasks */}
+                        <div className="bg-white rounded-3xl shadow-2xl p-6 mb-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <h2 className="text-2xl font-bold text-gray-800">
+                                    📝 Active Tasks
+                                </h2>
+                                <span className="px-3 py-1 bg-purple-200 text-purple-800 rounded-full font-bold">
+                                    {activeTasks.length}
+                                </span>
+                            </div>
+                            
+                            {activeTasks.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <div className="text-7xl mb-4 cat-bounce">😸</div>
+                                    <p className="text-2xl font-bold text-gray-600">All done! You're amazing! 🎉</p>
+                                    <p className="text-lg text-gray-500 mt-2">Time for some catnip! 🌿</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {activeTasks.map(task => {
+                                        const priority = task.priority || 0;
+                                        const borderColor = getPriorityBorderColor(priority);
+                                        const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+                                        const isExpanded = expandedTasks[task.id];
+                                        const completedSubtasks = task.subtasks?.filter(st => st.completed).length || 0;
+                                        const totalSubtasks = task.subtasks?.length || 0;
+
+                                        return (
+                                            <div
+                                                key={task.id}
+                                                className={`priority-border rounded-2xl p-5 transition-all shadow-md hover:shadow-xl ${getPriorityColor(priority)}`}
+                                                style={{ 
+                                                    borderWidth: '4px',
+                                                    borderStyle: 'solid',
+                                                    borderColor: borderColor
+                                                }}
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <button
+                                                        onClick={() => toggleTask(task.id)}
+                                                        className="mt-1 w-7 h-7 border-3 border-purple-400 rounded-lg hover:border-pink-500 hover:bg-pink-100 flex-shrink-0 transition-all transform hover:scale-110"
+                                                    >
+                                                    </button>
+                                                    
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-gray-800 font-bold text-lg break-words">{task.text}</p>
+                                                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                                                            <span className="px-3 py-1 bg-white rounded-full font-bold text-sm shadow-sm">
+                                                                {getPriorityLabel(priority)}
+                                                            </span>
+                                                            <span className="px-2 py-1 bg-gray-100 rounded-full text-xs font-semibold text-gray-600">
+                                                                Score: {priority}
+                                                            </span>
+                                                            {task.dueDate && (
+                                                                <span className="text-gray-700 font-semibold text-sm">
+                                                                    {formatDueDate(task.dueDate)}
+                                                                </span>
+                                                            )}
+                                                            {hasSubtasks && (
+                                                                <span className="text-gray-600 text-sm font-semibold">
+                                                                    📋 {completedSubtasks}/{totalSubtasks} subtasks
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Subtasks dropdown */}
+                                                        <div className="mt-3">
+                                                            <div className="flex gap-2">
+                                                                {hasSubtasks && (
+                                                                    <button
+                                                                        onClick={() => toggleTaskExpansion(task.id)}
+                                                                        className="text-sm font-bold text-purple-600 hover:text-pink-600 flex items-center gap-1"
+                                                                    >
+                                                                        <span className={`collapse-button ${isExpanded ? 'open' : ''}`}>▼</span>
+                                                                        {isExpanded ? 'Hide' : 'Show'} subtasks
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => setAddingSubtaskTo(addingSubtaskTo === task.id ? null : task.id)}
+                                                                    className="text-sm font-bold text-purple-600 hover:text-pink-600"
+                                                                >
+                                                                    ➕ Add subtask
+                                                                </button>
+                                                            </div>
+
+                                                            {/* Add subtask input */}
+                                                            {addingSubtaskTo === task.id && (
+                                                                <div className="flex gap-2 mt-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={newSubtask}
+                                                                        onChange={(e) => setNewSubtask(e.target.value)}
+                                                                        onKeyPress={(e) => e.key === 'Enter' && addSubtask(task.id)}
+                                                                        placeholder="Subtask name..."
+                                                                        className="flex-1 px-3 py-2 border-2 border-purple-300 rounded-lg focus:outline-none focus:border-pink-400 text-sm"
+                                                                        autoFocus
+                                                                    />
+                                                                    <button
+                                                                        onClick={() => addSubtask(task.id)}
+                                                                        className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-pink-500 font-bold text-sm"
+                                                                    >
+                                                                        Add
+                                                                    </button>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Subtasks list */}
+                                                            <div className={`subtask-list ${isExpanded ? 'open' : ''}`}>
+                                                                {hasSubtasks && (
+                                                                    <div className="mt-3 space-y-2 pl-2 border-l-2 border-purple-200">
+                                                                        {task.subtasks.map(subtask => (
+                                                                            <div key={subtask.id} className="flex items-center gap-2">
+                                                                                <button
+                                                                                    onClick={() => toggleSubtask(task.id, subtask.id)}
+                                                                                    className={`w-5 h-5 border-2 rounded flex-shrink-0 flex items-center justify-center ${
+                                                                                        subtask.completed 
+                                                                                            ? 'bg-green-500 border-green-500' 
+                                                                                            : 'border-purple-300 hover:border-pink-400'
+                                                                                    }`}
+                                                                                >
+                                                                                    {subtask.completed && (
+                                                                                        <span className="text-white text-xs font-bold">✓</span>
+                                                                                    )}
+                                                                                </button>
+                                                                                <span className={`flex-1 text-sm ${subtask.completed ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                                                                                    {subtask.text}
+                                                                                </span>
+                                                                                <button
+                                                                                    onClick={() => deleteSubtask(task.id, subtask.id)}
+                                                                                    className="text-sm hover:scale-110 transition-transform"
+                                                                                >
+                                                                                    🗑️
+                                                                                </button>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <button
+                                                        onClick={() => deleteTask(task.id)}
+                                                        className="text-2xl flex-shrink-0 transform hover:scale-125 transition-all"
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Completed Tasks - Collapsible Sleeve */}
+                        {completedTasks.length > 0 && (
+                            <div className="bg-white rounded-3xl shadow-2xl p-6 overflow-hidden">
+                                <button
+                                    onClick={() => setShowCompleted(!showCompleted)}
+                                    className="w-full flex items-center justify-between mb-4 hover:bg-gray-50 p-2 rounded-xl transition-all"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-2xl font-bold text-gray-800">
+                                            ✅ Completed
+                                        </h2>
+                                        <span className="px-3 py-1 bg-green-200 text-green-800 rounded-full font-bold">
+                                            {completedTasks.length}
+                                        </span>
+                                    </div>
+                                    <span className={`text-2xl transition-transform ${showCompleted ? 'rotate-180' : ''}`}>
+                                        ▼
+                                    </span>
+                                </button>
+                                
+                                <div className={`subtask-list ${showCompleted ? 'open' : ''}`}>
+                                    <div className="space-y-3">
+                                        {completedTasks.map(task => (
+                                            <div
+                                                key={task.id}
+                                                className="border-3 border-gray-300 rounded-2xl p-5 bg-gray-50"
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <button
+                                                        onClick={() => toggleTask(task.id)}
+                                                        className="mt-1 w-7 h-7 border-3 border-green-500 bg-green-500 rounded-lg flex-shrink-0 flex items-center justify-center"
+                                                    >
+                                                        <span className="text-white font-bold">✓</span>
+                                                    </button>
+                                                    
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-gray-500 line-through font-semibold text-lg break-words">{task.text}</p>
+                                                        {task.subtasks && task.subtasks.length > 0 && (
+                                                            <div className="mt-2 space-y-1 pl-2 border-l-2 border-gray-300">
+                                                                {task.subtasks.map(subtask => (
+                                                                    <div key={subtask.id} className="flex items-center gap-2">
+                                                                        <span className={`text-sm ${subtask.completed ? 'line-through text-gray-400' : 'text-gray-500'}`}>
+                                                                            {subtask.completed ? '✓' : '○'} {subtask.text}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    <button
+                                                        onClick={() => deleteTask(task.id)}
+                                                        className="text-2xl flex-shrink-0 transform hover:scale-125 transition-all"
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* Footer cat */}
+                        <div className="text-center mt-8 text-4xl cat-bounce">
+                            🐾
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<TaskManager />, document.getElementById('root'));
+    </script>
+</body>
+</html>
