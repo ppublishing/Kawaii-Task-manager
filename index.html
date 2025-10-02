@@ -1149,19 +1149,53 @@
         ReactDOM.render(<App />, document.getElementById('root'));
     </script>
 
-    <!-- PWA Service Worker Registration -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./service-worker.js')
-                    .then((registration) => {
-                        console.log('✨ PWA Service Worker registered!', registration.scope);
-                    })
-                    .catch((error) => {
-                        console.log('Service Worker registration failed:', error);
+    <!-- PWA Service Worker Registration with Auto-Update -->
+<script>
+    if ('serviceWorker' in navigator) {
+        let refreshing = false;
+        
+        // Detect when new service worker is ready
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            refreshing = true;
+            console.log('🔄 New version available! Reloading...');
+            window.location.reload();
+        });
+
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then((registration) => {
+                    console.log('✨ PWA Service Worker registered!', registration.scope);
+                    
+                    // Check for updates every 30 seconds
+                    setInterval(() => {
+                        console.log('🔍 Checking for updates...');
+                        registration.update();
+                    }, 30000);
+                    
+                    // Listen for updates
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        console.log('📦 New version found! Installing...');
+                        
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // New service worker available, tell user
+                                console.log('✅ New version ready!');
+                                
+                                // Show update notification
+                                if (confirm('🎉 New update available! Reload to get the latest version?')) {
+                                    newWorker.postMessage({ type: 'SKIP_WAITING' });
+                                }
+                            }
+                        });
                     });
-            });
-        }
-    </script>
+                })
+                .catch((error) => {
+                    console.log('Service Worker registration failed:', error);
+                });
+        });
+    }
+</script>
 </body>
 </html>
