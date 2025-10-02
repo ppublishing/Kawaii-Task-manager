@@ -1,4 +1,10 @@
-const CACHE_NAME = 'kawaii-tasks-v2';
+// Listen for SKIP_WAITING message
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
+});
+const CACHE_NAME = 'kawaii-tasks-v3';
 const urlsToCache = [
   './',
   './index.html',
