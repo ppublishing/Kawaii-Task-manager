@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kawaii Cat Task Manager 🐱</title>
+<!-- PWA Meta Tags -->
+<meta name="theme-color" content="#a855f7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cat Tasks">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -904,5 +912,31 @@
 
         ReactDOM.render(<TaskManager />, document.getElementById('root'));
     </script>
+<!-- PWA Service Worker Registration -->
+<script>
+    // Register service worker for PWA functionality
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then((registration) => {
+                    console.log('✨ PWA Service Worker registered!', registration.scope);
+                })
+                .catch((error) => {
+                    console.log('Service Worker registration failed:', error);
+                });
+        });
+    }
+
+    // Prompt to install PWA
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        console.log('💫 App is installable!');
+        
+        // You can show a custom install button here if you want
+        // For now, browser will show its own install prompt
+    });
+</script>
 </body>
 </html>
