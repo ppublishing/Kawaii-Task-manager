@@ -73,7 +73,7 @@
         }
 
         .subtask-list.open {
-            max-height: 500px;
+            max-height: 2000px;
         }
 
         .collapse-button {
@@ -201,6 +201,54 @@
             color: #6b7280;
             margin-top: 1rem;
         }
+
+        .subtask-border {
+            transition: border-color 0.3s ease;
+        }
+
+        /* Mobile-optimized edit modal */
+        .edit-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            padding: 1rem;
+        }
+
+        .edit-modal {
+            background: white;
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .edit-modal {
+                max-height: 80vh;
+            }
+        }
     </style>
 </head>
 <body>
@@ -318,6 +366,66 @@
                         
                         <div className="celebration-message">
                             Task completed! 🌟
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Edit Modal Component for Mobile
+        function EditModal({ title, text, date, onSave, onCancel }) {
+            const [editText, setEditText] = useState(text);
+            const [editDate, setEditDate] = useState(date || '');
+
+            const handleSave = () => {
+                onSave(editText, editDate);
+            };
+
+            return (
+                <div className="edit-modal-overlay" onClick={onCancel}>
+                    <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-xl font-bold text-gray-800 mb-4">{title}</h3>
+                        
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                    Text
+                                </label>
+                                <textarea
+                                    value={editText}
+                                    onChange={(e) => setEditText(e.target.value)}
+                                    className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:outline-none focus:border-pink-400 text-base resize-none"
+                                    rows="3"
+                                    autoFocus
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                    Due Date (Optional)
+                                </label>
+                                <input
+                                    type="date"
+                                    value={editDate}
+                                    onChange={(e) => setEditDate(e.target.value)}
+                                    className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:outline-none focus:border-pink-400 text-base"
+                                />
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={handleSave}
+                                    className="flex-1 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 font-bold text-base shadow-lg"
+                                >
+                                    ✓ Save
+                                </button>
+                                <button
+                                    onClick={onCancel}
+                                    className="flex-1 py-3 bg-gray-300 text-gray-700 rounded-xl hover:bg-gray-400 font-bold text-base shadow-lg"
+                                >
+                                    ✕ Cancel
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -520,12 +628,10 @@
             const [expandedTasks, setExpandedTasks] = useState({});
             const [addingSubtaskTo, setAddingSubtaskTo] = useState(null);
             const [newSubtask, setNewSubtask] = useState('');
+            const [newSubtaskDate, setNewSubtaskDate] = useState('');
             const [showCelebration, setShowCelebration] = useState(false);
             const [editingTask, setEditingTask] = useState(null);
-            const [editingTaskText, setEditingTaskText] = useState('');
-            const [editingTaskDate, setEditingTaskDate] = useState('');
             const [editingSubtask, setEditingSubtask] = useState(null);
-            const [editingSubtaskText, setEditingSubtaskText] = useState('');
 
             const calculatePriority = (taskText, dueDate) => {
                 let priority = 0;
@@ -572,6 +678,26 @@
                 return Math.min(priority, 100);
             };
 
+            const recalculateTaskPriority = (task) => {
+                // Calculate base priority for main task
+                const mainPriority = calculatePriority(task.text, task.dueDate);
+                
+                // If task has subtasks, consider the highest priority subtask
+                if (task.subtasks && task.subtasks.length > 0) {
+                    const subtaskPriorities = task.subtasks
+                        .filter(st => !st.completed)
+                        .map(st => calculatePriority(st.text, st.dueDate));
+                    
+                    if (subtaskPriorities.length > 0) {
+                        const maxSubtaskPriority = Math.max(...subtaskPriorities);
+                        // Use the higher priority between main task and subtasks
+                        return Math.max(mainPriority, maxSubtaskPriority);
+                    }
+                }
+                
+                return mainPriority;
+            };
+
             // Load tasks from Firebase
             useEffect(() => {
                 if (!db) return;
@@ -581,7 +707,13 @@
                     .onSnapshot(snapshot => {
                         const tasksData = [];
                         snapshot.forEach(doc => {
-                            tasksData.push({ id: doc.id, ...doc.data() });
+                            const data = doc.data();
+                            const recalculatedPriority = recalculateTaskPriority(data);
+                            tasksData.push({ 
+                                id: doc.id, 
+                                ...data,
+                                priority: recalculatedPriority
+                            });
                         });
                         tasksData.sort((a, b) => (b.priority || 0) - (a.priority || 0));
                         setTasks(tasksData);
@@ -635,38 +767,29 @@
                 setSyncing(false);
             };
 
-            const startEditingTask = (task) => {
-                setEditingTask(task.id);
-                setEditingTaskText(task.text);
-                setEditingTaskDate(task.dueDate || '');
-            };
-
-            const saveTaskEdit = async () => {
-                if (!editingTaskText.trim()) return;
+            const saveTaskEdit = async (text, date) => {
+                if (!text.trim()) return;
                 if (!db) return;
 
                 setSyncing(true);
-                const priority = calculatePriority(editingTaskText, editingTaskDate);
+                const task = tasks.find(t => t.id === editingTask);
+                const priority = recalculateTaskPriority({
+                    ...task,
+                    text: text,
+                    dueDate: date
+                });
 
                 try {
                     await db.collection('tasks').doc(editingTask).update({
-                        text: editingTaskText,
-                        dueDate: editingTaskDate,
+                        text: text,
+                        dueDate: date,
                         priority: priority
                     });
                     setEditingTask(null);
-                    setEditingTaskText('');
-                    setEditingTaskDate('');
                 } catch (error) {
                     console.error('Error updating task:', error);
                 }
                 setSyncing(false);
-            };
-
-            const cancelTaskEdit = () => {
-                setEditingTask(null);
-                setEditingTaskText('');
-                setEditingTaskDate('');
             };
 
             const addSubtask = async (taskId) => {
@@ -680,14 +803,24 @@
                 const newSubtaskObj = {
                     id: Date.now().toString(),
                     text: newSubtask,
-                    completed: false
+                    dueDate: newSubtaskDate,
+                    completed: false,
+                    priority: calculatePriority(newSubtask, newSubtaskDate)
                 };
+
+                const updatedSubtasks = [...subtasks, newSubtaskObj];
+                const newTaskPriority = recalculateTaskPriority({
+                    ...task,
+                    subtasks: updatedSubtasks
+                });
 
                 try {
                     await db.collection('tasks').doc(taskId).update({
-                        subtasks: [...subtasks, newSubtaskObj]
+                        subtasks: updatedSubtasks,
+                        priority: newTaskPriority
                     });
                     setNewSubtask('');
+                    setNewSubtaskDate('');
                     setAddingSubtaskTo(null);
                 } catch (error) {
                     console.error('Error adding subtask:', error);
@@ -695,38 +828,38 @@
                 setSyncing(false);
             };
 
-            const startEditingSubtask = (taskId, subtask) => {
-                setEditingSubtask({ taskId, subtaskId: subtask.id });
-                setEditingSubtaskText(subtask.text);
-            };
-
-            const saveSubtaskEdit = async () => {
-                if (!editingSubtaskText.trim()) return;
+            const saveSubtaskEdit = async (text, date) => {
+                if (!text.trim()) return;
                 if (!db) return;
 
                 setSyncing(true);
                 const task = tasks.find(t => t.id === editingSubtask.taskId);
                 const updatedSubtasks = task.subtasks.map(st => 
                     st.id === editingSubtask.subtaskId 
-                        ? { ...st, text: editingSubtaskText } 
+                        ? { 
+                            ...st, 
+                            text: text,
+                            dueDate: date,
+                            priority: calculatePriority(text, date)
+                          } 
                         : st
                 );
 
+                const newTaskPriority = recalculateTaskPriority({
+                    ...task,
+                    subtasks: updatedSubtasks
+                });
+
                 try {
                     await db.collection('tasks').doc(editingSubtask.taskId).update({
-                        subtasks: updatedSubtasks
+                        subtasks: updatedSubtasks,
+                        priority: newTaskPriority
                     });
                     setEditingSubtask(null);
-                    setEditingSubtaskText('');
                 } catch (error) {
                     console.error('Error updating subtask:', error);
                 }
                 setSyncing(false);
-            };
-
-            const cancelSubtaskEdit = () => {
-                setEditingSubtask(null);
-                setEditingSubtaskText('');
             };
 
             const toggleSubtask = async (taskId, subtaskId) => {
@@ -741,9 +874,15 @@
                     st.id === subtaskId ? { ...st, completed: !st.completed } : st
                 );
 
+                const newTaskPriority = recalculateTaskPriority({
+                    ...task,
+                    subtasks: updatedSubtasks
+                });
+
                 try {
                     await db.collection('tasks').doc(taskId).update({
-                        subtasks: updatedSubtasks
+                        subtasks: updatedSubtasks,
+                        priority: newTaskPriority
                     });
                     
                     if (!wasCompleted) {
@@ -762,9 +901,15 @@
                 const task = tasks.find(t => t.id === taskId);
                 const updatedSubtasks = task.subtasks.filter(st => st.id !== subtaskId);
 
+                const newTaskPriority = recalculateTaskPriority({
+                    ...task,
+                    subtasks: updatedSubtasks
+                });
+
                 try {
                     await db.collection('tasks').doc(taskId).update({
-                        subtasks: updatedSubtasks
+                        subtasks: updatedSubtasks,
+                        priority: newTaskPriority
                     });
                 } catch (error) {
                     console.error('Error deleting subtask:', error);
@@ -892,6 +1037,26 @@
                         <Celebration onClose={() => setShowCelebration(false)} />
                     )}
 
+                    {editingTask && (
+                        <EditModal
+                            title="Edit Task"
+                            text={tasks.find(t => t.id === editingTask)?.text || ''}
+                            date={tasks.find(t => t.id === editingTask)?.dueDate || ''}
+                            onSave={saveTaskEdit}
+                            onCancel={() => setEditingTask(null)}
+                        />
+                    )}
+
+                    {editingSubtask && (
+                        <EditModal
+                            title="Edit Subtask"
+                            text={tasks.find(t => t.id === editingSubtask.taskId)?.subtasks.find(st => st.id === editingSubtask.subtaskId)?.text || ''}
+                            date={tasks.find(t => t.id === editingSubtask.taskId)?.subtasks.find(st => st.id === editingSubtask.subtaskId)?.dueDate || ''}
+                            onSave={saveSubtaskEdit}
+                            onCancel={() => setEditingSubtask(null)}
+                        />
+                    )}
+
                     <div className="paw-print" style={{top: '10%', left: '5%'}}>🐾</div>
                     <div className="paw-print" style={{top: '20%', right: '10%'}}>🐾</div>
                     <div className="paw-print" style={{bottom: '15%', left: '15%'}}>🐾</div>
@@ -986,7 +1151,11 @@
                                         const isExpanded = expandedTasks[task.id];
                                         const completedSubtasks = task.subtasks?.filter(st => st.completed).length || 0;
                                         const totalSubtasks = task.subtasks?.length || 0;
-                                        const isEditingThisTask = editingTask === task.id;
+                                        
+                                        // Sort subtasks by priority (highest first)
+                                        const sortedSubtasks = hasSubtasks 
+                                            ? [...task.subtasks].sort((a, b) => (b.priority || 0) - (a.priority || 0))
+                                            : [];
 
                                         return (
                                             <div
@@ -1006,93 +1175,65 @@
                                                     </button>
                                                     
                                                     <div className="flex-1 min-w-0">
-                                                        {isEditingThisTask ? (
-                                                            <div className="space-y-2 mb-3">
-                                                                <input
-                                                                    type="text"
-                                                                    value={editingTaskText}
-                                                                    onChange={(e) => setEditingTaskText(e.target.value)}
-                                                                    className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:outline-none focus:border-pink-400 text-lg font-bold"
-                                                                    autoFocus
-                                                                />
-                                                                <input
-                                                                    type="date"
-                                                                    value={editingTaskDate}
-                                                                    onChange={(e) => setEditingTaskDate(e.target.value)}
-                                                                    className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:outline-none focus:border-pink-400"
-                                                                />
-                                                                <div className="flex gap-2">
+                                                        <p className="text-gray-800 font-bold text-lg break-words">{task.text}</p>
+                                                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                                                            <span className="px-3 py-1 bg-white rounded-full font-bold text-sm shadow-sm">
+                                                                {getPriorityLabel(priority)}
+                                                            </span>
+                                                            {task.dueDate && (
+                                                                <span className="text-gray-700 font-semibold text-sm">
+                                                                    {formatDueDate(task.dueDate)}
+                                                                </span>
+                                                            )}
+                                                            {hasSubtasks && (
+                                                                <span className="text-gray-600 text-sm font-semibold">
+                                                                    📋 {completedSubtasks}/{totalSubtasks} subtasks
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="mt-3">
+                                                            <div className="flex flex-wrap gap-2">
+                                                                <button
+                                                                    onClick={() => setEditingTask(task.id)}
+                                                                    className="text-sm font-bold text-blue-600 hover:text-blue-800"
+                                                                >
+                                                                    ✏️ Edit
+                                                                </button>
+                                                                {hasSubtasks && (
                                                                     <button
-                                                                        onClick={saveTaskEdit}
-                                                                        className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-bold text-sm"
+                                                                        onClick={() => toggleTaskExpansion(task.id)}
+                                                                        className="text-sm font-bold text-purple-600 hover:text-pink-600 flex items-center gap-1"
                                                                     >
-                                                                        ✓ Save
+                                                                        <span className={`collapse-button ${isExpanded ? 'open' : ''}`}>▼</span>
+                                                                        {isExpanded ? 'Hide' : 'Show'} subtasks
                                                                     </button>
-                                                                    <button
-                                                                        onClick={cancelTaskEdit}
-                                                                        className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 font-bold text-sm"
-                                                                    >
-                                                                        ✕ Cancel
-                                                                    </button>
-                                                                </div>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => setAddingSubtaskTo(addingSubtaskTo === task.id ? null : task.id)}
+                                                                    className="text-sm font-bold text-purple-600 hover:text-pink-600"
+                                                                >
+                                                                    ➕ Add subtask
+                                                                </button>
                                                             </div>
-                                                        ) : (
-                                                            <>
-                                                                <p className="text-gray-800 font-bold text-lg break-words">{task.text}</p>
-                                                                <div className="flex flex-wrap items-center gap-2 mt-2">
-                                                                    <span className="px-3 py-1 bg-white rounded-full font-bold text-sm shadow-sm">
-                                                                        {getPriorityLabel(priority)}
-                                                                    </span>
-                                                                    {task.dueDate && (
-                                                                        <span className="text-gray-700 font-semibold text-sm">
-                                                                            {formatDueDate(task.dueDate)}
-                                                                        </span>
-                                                                    )}
-                                                                    {hasSubtasks && (
-                                                                        <span className="text-gray-600 text-sm font-semibold">
-                                                                            📋 {completedSubtasks}/{totalSubtasks} subtasks
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            </>
-                                                        )}
 
-                                                        {!isEditingThisTask && (
-                                                            <div className="mt-3">
-                                                                <div className="flex gap-2">
-                                                                    <button
-                                                                        onClick={() => startEditingTask(task)}
-                                                                        className="text-sm font-bold text-blue-600 hover:text-blue-800"
-                                                                    >
-                                                                        ✏️ Edit
-                                                                    </button>
-                                                                    {hasSubtasks && (
-                                                                        <button
-                                                                            onClick={() => toggleTaskExpansion(task.id)}
-                                                                            className="text-sm font-bold text-purple-600 hover:text-pink-600 flex items-center gap-1"
-                                                                        >
-                                                                            <span className={`collapse-button ${isExpanded ? 'open' : ''}`}>▼</span>
-                                                                            {isExpanded ? 'Hide' : 'Show'} subtasks
-                                                                        </button>
-                                                                    )}
-                                                                    <button
-                                                                        onClick={() => setAddingSubtaskTo(addingSubtaskTo === task.id ? null : task.id)}
-                                                                        className="text-sm font-bold text-purple-600 hover:text-pink-600"
-                                                                    >
-                                                                        ➕ Add subtask
-                                                                    </button>
-                                                                </div>
-
-                                                                {addingSubtaskTo === task.id && (
-                                                                    <div className="flex gap-2 mt-2">
+                                                            {addingSubtaskTo === task.id && (
+                                                                <div className="mt-2 space-y-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={newSubtask}
+                                                                        onChange={(e) => setNewSubtask(e.target.value)}
+                                                                        onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && addSubtask(task.id)}
+                                                                        placeholder="Subtask name..."
+                                                                        className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:outline-none focus:border-pink-400 text-sm"
+                                                                        autoFocus
+                                                                    />
+                                                                    <div className="flex gap-2">
                                                                         <input
-                                                                            type="text"
-                                                                            value={newSubtask}
-                                                                            onChange={(e) => setNewSubtask(e.target.value)}
-                                                                            onKeyPress={(e) => e.key === 'Enter' && addSubtask(task.id)}
-                                                                            placeholder="Subtask name..."
+                                                                            type="date"
+                                                                            value={newSubtaskDate}
+                                                                            onChange={(e) => setNewSubtaskDate(e.target.value)}
                                                                             className="flex-1 px-3 py-2 border-2 border-purple-300 rounded-lg focus:outline-none focus:border-pink-400 text-sm"
-                                                                            autoFocus
                                                                         />
                                                                         <button
                                                                             onClick={() => addSubtask(task.id)}
@@ -1101,77 +1242,74 @@
                                                                             Add
                                                                         </button>
                                                                     </div>
-                                                                )}
-
-                                                                <div className={`subtask-list ${isExpanded ? 'open' : ''}`}>
-                                                                    {hasSubtasks && (
-                                                                        <div className="mt-3 space-y-2 pl-2 border-l-2 border-purple-200">
-                                                                            {task.subtasks.map(subtask => {
-                                                                                const isEditingThisSubtask = editingSubtask?.taskId === task.id && editingSubtask?.subtaskId === subtask.id;
-                                                                                
-                                                                                return (
-                                                                                    <div key={subtask.id} className="flex items-center gap-2">
-                                                                                        {isEditingThisSubtask ? (
-                                                                                            <>
-                                                                                                <input
-                                                                                                    type="text"
-                                                                                                    value={editingSubtaskText}
-                                                                                                    onChange={(e) => setEditingSubtaskText(e.target.value)}
-                                                                                                    className="flex-1 px-2 py-1 border-2 border-purple-300 rounded focus:outline-none focus:border-pink-400 text-sm"
-                                                                                                    autoFocus
-                                                                                                />
-                                                                                                <button
-                                                                                                    onClick={saveSubtaskEdit}
-                                                                                                    className="text-green-600 hover:text-green-800 font-bold text-sm"
-                                                                                                >
-                                                                                                    ✓
-                                                                                                </button>
-                                                                                                <button
-                                                                                                    onClick={cancelSubtaskEdit}
-                                                                                                    className="text-gray-600 hover:text-gray-800 font-bold text-sm"
-                                                                                                >
-                                                                                                    ✕
-                                                                                                </button>
-                                                                                            </>
-                                                                                        ) : (
-                                                                                            <>
-                                                                                                <button
-                                                                                                    onClick={() => toggleSubtask(task.id, subtask.id)}
-                                                                                                    className={`w-5 h-5 border-2 rounded flex-shrink-0 flex items-center justify-center ${
-                                                                                                        subtask.completed 
-                                                                                                            ? 'bg-green-500 border-green-500' 
-                                                                                                            : 'border-purple-300 hover:border-pink-400'
-                                                                                                    }`}
-                                                                                                >
-                                                                                                    {subtask.completed && (
-                                                                                                        <span className="text-white text-xs font-bold">✓</span>
-                                                                                                    )}
-                                                                                                </button>
-                                                                                                <span className={`flex-1 text-sm ${subtask.completed ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-                                                                                                    {subtask.text}
-                                                                                                </span>
-                                                                                                <button
-                                                                                                    onClick={() => startEditingSubtask(task.id, subtask)}
-                                                                                                    className="text-sm hover:scale-110 transition-transform"
-                                                                                                >
-                                                                                                    ✏️
-                                                                                                </button>
-                                                                                                <button
-                                                                                                    onClick={() => deleteSubtask(task.id, subtask.id)}
-                                                                                                    className="text-sm hover:scale-110 transition-transform"
-                                                                                                >
-                                                                                                    🗑️
-                                                                                                </button>
-                                                                                            </>
-                                                                                        )}
-                                                                                    </div>
-                                                                                );
-                                                                            })}
-                                                                        </div>
-                                                                    )}
                                                                 </div>
+                                                            )}
+
+                                                            <div className={`subtask-list ${isExpanded ? 'open' : ''}`}>
+                                                                {hasSubtasks && (
+                                                                    <div className="mt-3 space-y-2 pl-2 border-l-4 border-purple-200">
+                                                                        {sortedSubtasks.map(subtask => {
+                                                                            const subtaskPriority = subtask.priority || 0;
+                                                                            const subtaskBorderColor = getPriorityBorderColor(subtaskPriority);
+                                                                            
+                                                                            return (
+                                                                                <div 
+                                                                                    key={subtask.id} 
+                                                                                    className={`subtask-border rounded-lg p-2 ${subtask.completed ? 'bg-gray-50' : 'bg-white'}`}
+                                                                                    style={{
+                                                                                        borderLeft: `4px solid ${subtaskBorderColor}`
+                                                                                    }}
+                                                                                >
+                                                                                    <div className="flex items-start gap-2">
+                                                                                        <button
+                                                                                            onClick={() => toggleSubtask(task.id, subtask.id)}
+                                                                                            className={`mt-1 w-5 h-5 border-2 rounded flex-shrink-0 flex items-center justify-center ${
+                                                                                                subtask.completed 
+                                                                                                    ? 'bg-green-500 border-green-500' 
+                                                                                                    : 'border-purple-300 hover:border-pink-400'
+                                                                                            }`}
+                                                                                        >
+                                                                                            {subtask.completed && (
+                                                                                                <span className="text-white text-xs font-bold">✓</span>
+                                                                                            )}
+                                                                                        </button>
+                                                                                        <div className="flex-1 min-w-0">
+                                                                                            <span className={`text-sm block ${subtask.completed ? 'line-through text-gray-400' : 'text-gray-700 font-semibold'}`}>
+                                                                                                {subtask.text}
+                                                                                            </span>
+                                                                                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                                                                <span className="text-xs px-2 py-0.5 bg-white rounded-full font-bold shadow-sm">
+                                                                                                    {getPriorityLabel(subtaskPriority)}
+                                                                                                </span>
+                                                                                                {subtask.dueDate && (
+                                                                                                    <span className="text-xs text-gray-600 font-semibold">
+                                                                                                        {formatDueDate(subtask.dueDate)}
+                                                                                                    </span>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div className="flex gap-1 flex-shrink-0">
+                                                                                            <button
+                                                                                                onClick={() => setEditingSubtask({ taskId: task.id, subtaskId: subtask.id })}
+                                                                                                className="text-lg p-1 hover:scale-110 transition-transform"
+                                                                                            >
+                                                                                                ✏️
+                                                                                            </button>
+                                                                                            <button
+                                                                                                onClick={() => deleteSubtask(task.id, subtask.id)}
+                                                                                                className="text-lg p-1 hover:scale-110 transition-transform"
+                                                                                            >
+                                                                                                🗑️
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                        )}
+                                                        </div>
                                                     </div>
                                                     
                                                     <button
@@ -1231,6 +1369,11 @@
                                                                         <span className={`text-sm ${subtask.completed ? 'line-through text-gray-400' : 'text-gray-500'}`}>
                                                                             {subtask.completed ? '✓' : '○'} {subtask.text}
                                                                         </span>
+                                                                        {subtask.dueDate && (
+                                                                            <span className="text-xs text-gray-400">
+                                                                                {formatDueDate(subtask.dueDate)}
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                 ))}
                                                             </div>
