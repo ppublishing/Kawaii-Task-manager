@@ -314,6 +314,32 @@
             return hash.toString(36);
         };
 
+        // Calculate next occurrence date based on repeat type
+        const getNextOccurrence = (currentDate, repeatType) => {
+            if (!currentDate || !repeatType || repeatType === 'none') return null;
+            
+            const date = new Date(currentDate);
+            
+            switch(repeatType) {
+                case 'daily':
+                    date.setDate(date.getDate() + 1);
+                    break;
+                case 'weekly':
+                    date.setDate(date.getDate() + 7);
+                    break;
+                case 'monthly':
+                    date.setMonth(date.getMonth() + 1);
+                    break;
+                case 'yearly':
+                    date.setFullYear(date.getFullYear() + 1);
+                    break;
+                default:
+                    return null;
+            }
+            
+            return date.toISOString().split('T')[0];
+        };
+
         // Celebration Component
         function Celebration({ onClose }) {
             const [confetti, setConfetti] = useState([]);
@@ -373,12 +399,13 @@
         }
 
         // Edit Modal Component for Mobile
-        function EditModal({ title, text, date, onSave, onCancel }) {
+        function EditModal({ title, text, date, repeat, onSave, onCancel }) {
             const [editText, setEditText] = useState(text);
             const [editDate, setEditDate] = useState(date || '');
+            const [editRepeat, setEditRepeat] = useState(repeat || 'none');
 
             const handleSave = () => {
-                onSave(editText, editDate);
+                onSave(editText, editDate, editRepeat);
             };
 
             return (
@@ -410,6 +437,28 @@
                                     onChange={(e) => setEditDate(e.target.value)}
                                     className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:outline-none focus:border-pink-400 text-base"
                                 />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">
+                                    Repeat 🔄
+                                </label>
+                                <select
+                                    value={editRepeat}
+                                    onChange={(e) => setEditRepeat(e.target.value)}
+                                    className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:outline-none focus:border-pink-400 text-base font-semibold"
+                                >
+                                    <option value="none">Don't Repeat</option>
+                                    <option value="daily">Daily 📅</option>
+                                    <option value="weekly">Weekly 🗓️</option>
+                                    <option value="monthly">Monthly 📆</option>
+                                    <option value="yearly">Yearly 🎂</option>
+                                </select>
+                                {editRepeat !== 'none' && editDate && (
+                                    <p className="text-xs text-gray-600 mt-2">
+                                        Next: {getNextOccurrence(editDate, editRepeat)}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="flex gap-3 pt-2">
@@ -470,11 +519,9 @@
                     const usernameLower = username.toLowerCase().trim();
                     const passwordHash = simpleHash(password);
 
-                    // Check if user exists
                     const userDoc = await db.collection('users').doc(usernameLower).get();
 
                     if (isLogin) {
-                        // LOGIN
                         if (!userDoc.exists) {
                             setError('Username not found. Please sign up first!');
                             setLoading(false);
@@ -488,26 +535,22 @@
                             return;
                         }
 
-                        // Login successful!
                         safeLocalStorage.setItem('currentUser', usernameLower);
                         safeLocalStorage.setItem('userSession', passwordHash);
                         onLogin(usernameLower);
                     } else {
-                        // SIGNUP
                         if (userDoc.exists) {
                             setError('Username already taken. Please choose another one!');
                             setLoading(false);
                             return;
                         }
 
-                        // Create new user
                         await db.collection('users').doc(usernameLower).set({
                             username: usernameLower,
                             passwordHash: passwordHash,
                             createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
 
-                        // Auto-login after signup
                         safeLocalStorage.setItem('currentUser', usernameLower);
                         safeLocalStorage.setItem('userSession', passwordHash);
                         onLogin(usernameLower);
@@ -522,7 +565,6 @@
 
             return (
                 <div className="min-h-screen p-4 flex items-center justify-center relative overflow-hidden" style={{background: 'linear-gradient(135deg, #e9d5ff 0%, #ddd6fe 50%, #c7d2fe 100%)'}}>
-                    {/* Floating paw prints */}
                     <div className="paw-print" style={{top: '10%', left: '5%'}}>🐾</div>
                     <div className="paw-print" style={{top: '20%', right: '10%'}}>🐾</div>
                     <div className="paw-print" style={{bottom: '15%', left: '15%'}}>🐾</div>
@@ -530,12 +572,10 @@
 
                     <div className="w-full max-w-md">
                         <div className="bg-white rounded-3xl shadow-2xl p-8 relative overflow-hidden">
-                            {/* Decorative cat */}
                             <div className="absolute top-0 right-0 text-6xl cat-bounce opacity-20">
                                 🐱
                             </div>
 
-                            {/* Header */}
                             <div className="text-center mb-8">
                                 <div className="text-7xl mb-4 cat-bounce">😺</div>
                                 <h1 className="text-4xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent mb-2">
@@ -546,7 +586,6 @@
                                 </p>
                             </div>
 
-                            {/* Form */}
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 mb-2">
@@ -591,7 +630,6 @@
                                 </button>
                             </form>
 
-                            {/* Toggle Login/Signup */}
                             <div className="mt-6 text-center">
                                 <button
                                     onClick={() => {
@@ -605,7 +643,6 @@
                                 </button>
                             </div>
 
-                            {/* Info */}
                             <div className="mt-6 bg-purple-50 rounded-2xl p-4">
                                 <p className="text-xs text-gray-600 text-center">
                                     <strong>💡 Tip:</strong> Your username is your unique ID. You can access your tasks from any device by logging in!
@@ -622,6 +659,7 @@
             const [tasks, setTasks] = useState([]);
             const [newTask, setNewTask] = useState('');
             const [newDueDate, setNewDueDate] = useState('');
+            const [newRepeat, setNewRepeat] = useState('none');
             const [showCompleted, setShowCompleted] = useState(false);
             const [syncing, setSyncing] = useState(false);
             const [catMood, setCatMood] = useState('happy');
@@ -629,6 +667,7 @@
             const [addingSubtaskTo, setAddingSubtaskTo] = useState(null);
             const [newSubtask, setNewSubtask] = useState('');
             const [newSubtaskDate, setNewSubtaskDate] = useState('');
+            const [newSubtaskRepeat, setNewSubtaskRepeat] = useState('none');
             const [showCelebration, setShowCelebration] = useState(false);
             const [editingTask, setEditingTask] = useState(null);
             const [editingSubtask, setEditingSubtask] = useState(null);
@@ -643,19 +682,18 @@
                     due.setHours(0, 0, 0, 0);
                     const daysUntilDue = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
                     
-                    // Much stronger date-based priority
-                    if (daysUntilDue < 0) priority += 100;  // Overdue = MAX priority
-                    else if (daysUntilDue === 0) priority += 95;  // Today
-                    else if (daysUntilDue === 1) priority += 90;  // Tomorrow
-                    else if (daysUntilDue === 2) priority += 85;  // 2 days
-                    else if (daysUntilDue === 3) priority += 80;  // 3 days
-                    else if (daysUntilDue <= 7) priority += 70;   // This week
-                    else if (daysUntilDue <= 14) priority += 50;  // Next 2 weeks
-                    else if (daysUntilDue <= 30) priority += 30;  // This month
-                    else if (daysUntilDue <= 90) priority += 15;  // Next 3 months
-                    else priority += 5;  // Far future
+                    if (daysUntilDue < 0) priority += 100;
+                    else if (daysUntilDue === 0) priority += 95;
+                    else if (daysUntilDue === 1) priority += 90;
+                    else if (daysUntilDue === 2) priority += 85;
+                    else if (daysUntilDue === 3) priority += 80;
+                    else if (daysUntilDue <= 7) priority += 70;
+                    else if (daysUntilDue <= 14) priority += 50;
+                    else if (daysUntilDue <= 30) priority += 30;
+                    else if (daysUntilDue <= 90) priority += 15;
+                    else priority += 5;
                 } else {
-                    priority += 10;  // No date = lower priority
+                    priority += 10;
                 }
                 
                 const taskLower = taskText.toLowerCase();
@@ -675,18 +713,15 @@
                 
                 priority += keywordScore;
                 
-                // Small bonus for shorter tasks
                 if (taskText.length < 20) priority += 3;
                 else if (taskText.length < 40) priority += 1;
                 
-                return Math.min(priority, 150);  // Cap at 150
+                return Math.min(priority, 150);
             };
 
             const recalculateTaskPriority = (task) => {
-                // Calculate base priority for main task
                 const mainPriority = calculatePriority(task.text, task.dueDate);
                 
-                // If task has subtasks, find the HIGHEST priority among uncompleted subtasks
                 if (task.subtasks && task.subtasks.length > 0) {
                     const activeSubtasks = task.subtasks.filter(st => !st.completed);
                     
@@ -696,9 +731,6 @@
                         );
                         
                         const maxSubtaskPriority = Math.max(...subtaskPriorities);
-                        
-                        // IMPORTANT: Use the HIGHER priority between main task and subtasks
-                        // This ensures urgent subtasks bubble up the parent task
                         return Math.max(mainPriority, maxSubtaskPriority);
                     }
                 }
@@ -706,7 +738,6 @@
                 return mainPriority;
             };
 
-            // Load tasks from Firebase and recalculate priorities
             useEffect(() => {
                 if (!db) return;
 
@@ -718,13 +749,11 @@
                         snapshot.forEach(doc => {
                             const data = doc.data();
                             
-                            // Recalculate priorities for all subtasks
                             const updatedSubtasks = (data.subtasks || []).map(st => ({
                                 ...st,
                                 priority: calculatePriority(st.text, st.dueDate)
                             }));
                             
-                            // Recalculate main task priority considering subtasks
                             const taskWithUpdatedSubtasks = {
                                 ...data,
                                 subtasks: updatedSubtasks
@@ -739,7 +768,6 @@
                             });
                         });
                         
-                        // Sort by priority (highest first)
                         tasksData.sort((a, b) => (b.priority || 0) - (a.priority || 0));
                         
                         setTasks(tasksData);
@@ -748,7 +776,6 @@
                 return () => unsubscribe();
             }, [username]);
 
-            // Update cat mood
             useEffect(() => {
                 const activeTasks = tasks.filter(t => !t.completed);
                 const overdueTasks = activeTasks.filter(t => {
@@ -775,6 +802,7 @@
                 const task = {
                     text: newTask,
                     dueDate: newDueDate,
+                    repeat: newRepeat,
                     completed: false,
                     priority: priority,
                     username: username,
@@ -786,6 +814,7 @@
                     await db.collection('tasks').add(task);
                     setNewTask('');
                     setNewDueDate('');
+                    setNewRepeat('none');
                 } catch (error) {
                     console.error('Error adding task:', error);
                     alert('Error adding task. Please try again.');
@@ -793,7 +822,7 @@
                 setSyncing(false);
             };
 
-            const saveTaskEdit = async (text, date) => {
+            const saveTaskEdit = async (text, date, repeat) => {
                 if (!text.trim()) return;
                 if (!db) return;
 
@@ -809,6 +838,7 @@
                     await db.collection('tasks').doc(editingTask).update({
                         text: text,
                         dueDate: date,
+                        repeat: repeat,
                         priority: priority
                     });
                     setEditingTask(null);
@@ -830,6 +860,7 @@
                     id: Date.now().toString(),
                     text: newSubtask,
                     dueDate: newSubtaskDate,
+                    repeat: newSubtaskRepeat,
                     completed: false,
                     priority: calculatePriority(newSubtask, newSubtaskDate)
                 };
@@ -847,6 +878,7 @@
                     });
                     setNewSubtask('');
                     setNewSubtaskDate('');
+                    setNewSubtaskRepeat('none');
                     setAddingSubtaskTo(null);
                 } catch (error) {
                     console.error('Error adding subtask:', error);
@@ -854,7 +886,7 @@
                 setSyncing(false);
             };
 
-            const saveSubtaskEdit = async (text, date) => {
+            const saveSubtaskEdit = async (text, date, repeat) => {
                 if (!text.trim()) return;
                 if (!db) return;
 
@@ -866,6 +898,7 @@
                             ...st, 
                             text: text,
                             dueDate: date,
+                            repeat: repeat,
                             priority: calculatePriority(text, date)
                           } 
                         : st
@@ -896,9 +929,30 @@
                 const subtask = task.subtasks.find(st => st.id === subtaskId);
                 const wasCompleted = subtask.completed;
                 
-                const updatedSubtasks = task.subtasks.map(st => 
-                    st.id === subtaskId ? { ...st, completed: !st.completed } : st
-                );
+                let updatedSubtasks;
+                
+                if (!wasCompleted && subtask.repeat && subtask.repeat !== 'none' && subtask.dueDate) {
+                    // REPEATING SUBTASK: Create new instance with next date
+                    const nextDate = getNextOccurrence(subtask.dueDate, subtask.repeat);
+                    const newSubtask = {
+                        id: Date.now().toString(),
+                        text: subtask.text,
+                        dueDate: nextDate,
+                        repeat: subtask.repeat,
+                        completed: false,
+                        priority: calculatePriority(subtask.text, nextDate)
+                    };
+                    
+                    updatedSubtasks = task.subtasks.map(st => 
+                        st.id === subtaskId ? { ...st, completed: true } : st
+                    );
+                    updatedSubtasks.push(newSubtask);
+                } else {
+                    // REGULAR SUBTASK: Just toggle completion
+                    updatedSubtasks = task.subtasks.map(st => 
+                        st.id === subtaskId ? { ...st, completed: !st.completed } : st
+                    );
+                }
 
                 const newTaskPriority = recalculateTaskPriority({
                     ...task,
@@ -950,9 +1004,39 @@
                 const wasCompleted = task.completed;
                 
                 try {
-                    await db.collection('tasks').doc(id).update({
-                        completed: !task.completed
-                    });
+                    if (!wasCompleted && task.repeat && task.repeat !== 'none' && task.dueDate) {
+                        // REPEATING TASK: Create new instance with next date
+                        const nextDate = getNextOccurrence(task.dueDate, task.repeat);
+                        const newTask = {
+                            text: task.text,
+                            dueDate: nextDate,
+                            repeat: task.repeat,
+                            completed: false,
+                            priority: calculatePriority(task.text, nextDate),
+                            username: username,
+                            subtasks: task.subtasks.map(st => ({
+                                ...st,
+                                completed: false,
+                                dueDate: st.dueDate && st.repeat && st.repeat !== 'none' 
+                                    ? getNextOccurrence(st.dueDate, st.repeat) 
+                                    : st.dueDate
+                            })),
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        };
+                        
+                        // Mark current task as completed
+                        await db.collection('tasks').doc(id).update({
+                            completed: true
+                        });
+                        
+                        // Create new task for next occurrence
+                        await db.collection('tasks').add(newTask);
+                    } else {
+                        // REGULAR TASK: Just toggle completion
+                        await db.collection('tasks').doc(id).update({
+                            completed: !task.completed
+                        });
+                    }
                     
                     if (!wasCompleted) {
                         setShowCelebration(true);
@@ -990,13 +1074,13 @@
             };
 
             const getPriorityBorderColor = (priority) => {
-                if (priority >= 90) return '#dc2626';  // Extreme urgency
-                if (priority >= 75) return '#ef4444';  // Very high
-                if (priority >= 60) return '#f87171';  // High
-                if (priority >= 45) return '#fb7185';  // Medium-high
-                if (priority >= 30) return '#f472b6';  // Medium
-                if (priority >= 15) return '#e879f9';  // Low
-                return '#f0abfc';  // Very low
+                if (priority >= 90) return '#dc2626';
+                if (priority >= 75) return '#ef4444';
+                if (priority >= 60) return '#f87171';
+                if (priority >= 45) return '#fb7185';
+                if (priority >= 30) return '#f472b6';
+                if (priority >= 15) return '#e879f9';
+                return '#f0abfc';
             };
 
             const getPriorityColor = (priority) => {
@@ -1017,6 +1101,16 @@
                 if (priority >= 30) return '🌸 Medium';
                 if (priority >= 15) return '✨ Low';
                 return '🌙 Very Low';
+            };
+
+            const getRepeatLabel = (repeatType) => {
+                switch(repeatType) {
+                    case 'daily': return '🔄 Daily';
+                    case 'weekly': return '🔄 Weekly';
+                    case 'monthly': return '🔄 Monthly';
+                    case 'yearly': return '🔄 Yearly';
+                    default: return '';
+                }
             };
 
             const formatDueDate = (dateString) => {
@@ -1068,6 +1162,7 @@
                             title="Edit Task"
                             text={tasks.find(t => t.id === editingTask)?.text || ''}
                             date={tasks.find(t => t.id === editingTask)?.dueDate || ''}
+                            repeat={tasks.find(t => t.id === editingTask)?.repeat || 'none'}
                             onSave={saveTaskEdit}
                             onCancel={() => setEditingTask(null)}
                         />
@@ -1078,6 +1173,7 @@
                             title="Edit Subtask"
                             text={tasks.find(t => t.id === editingSubtask.taskId)?.subtasks.find(st => st.id === editingSubtask.subtaskId)?.text || ''}
                             date={tasks.find(t => t.id === editingSubtask.taskId)?.subtasks.find(st => st.id === editingSubtask.subtaskId)?.dueDate || ''}
+                            repeat={tasks.find(t => t.id === editingSubtask.taskId)?.subtasks.find(st => st.id === editingSubtask.subtaskId)?.repeat || 'none'}
                             onSave={saveSubtaskEdit}
                             onCancel={() => setEditingSubtask(null)}
                         />
@@ -1142,6 +1238,18 @@
                                         />
                                     </div>
                                     
+                                    <select
+                                        value={newRepeat}
+                                        onChange={(e) => setNewRepeat(e.target.value)}
+                                        className="px-4 py-4 border-3 border-purple-300 rounded-2xl focus:outline-none focus:border-pink-400 text-lg font-semibold shadow-lg"
+                                    >
+                                        <option value="none">Don't Repeat</option>
+                                        <option value="daily">Daily 📅</option>
+                                        <option value="weekly">Weekly 🗓️</option>
+                                        <option value="monthly">Monthly 📆</option>
+                                        <option value="yearly">Yearly 🎂</option>
+                                    </select>
+                                    
                                     <button
                                         onClick={addTask}
                                         className="px-8 py-4 bg-gradient-to-r from-pink-400 to-purple-500 text-white rounded-2xl hover:from-pink-500 hover:to-purple-600 font-bold text-lg shadow-lg transform hover:scale-105 transition-all"
@@ -1178,7 +1286,6 @@
                                         const completedSubtasks = task.subtasks?.filter(st => st.completed).length || 0;
                                         const totalSubtasks = task.subtasks?.length || 0;
                                         
-                                        // Sort subtasks by priority (highest first)
                                         const sortedSubtasks = hasSubtasks 
                                             ? [...task.subtasks].sort((a, b) => (b.priority || 0) - (a.priority || 0))
                                             : [];
@@ -1209,6 +1316,11 @@
                                                             {task.dueDate && (
                                                                 <span className="text-gray-700 font-semibold text-sm">
                                                                     {formatDueDate(task.dueDate)}
+                                                                </span>
+                                                            )}
+                                                            {task.repeat && task.repeat !== 'none' && (
+                                                                <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-bold text-xs">
+                                                                    {getRepeatLabel(task.repeat)}
                                                                 </span>
                                                             )}
                                                             {hasSubtasks && (
@@ -1261,6 +1373,17 @@
                                                                             onChange={(e) => setNewSubtaskDate(e.target.value)}
                                                                             className="flex-1 px-3 py-2 border-2 border-purple-300 rounded-lg focus:outline-none focus:border-pink-400 text-sm"
                                                                         />
+                                                                        <select
+                                                                            value={newSubtaskRepeat}
+                                                                            onChange={(e) => setNewSubtaskRepeat(e.target.value)}
+                                                                            className="px-3 py-2 border-2 border-purple-300 rounded-lg focus:outline-none focus:border-pink-400 text-sm font-semibold"
+                                                                        >
+                                                                            <option value="none">No Repeat</option>
+                                                                            <option value="daily">Daily</option>
+                                                                            <option value="weekly">Weekly</option>
+                                                                            <option value="monthly">Monthly</option>
+                                                                            <option value="yearly">Yearly</option>
+                                                                        </select>
                                                                         <button
                                                                             onClick={() => addSubtask(task.id)}
                                                                             className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-pink-500 font-bold text-sm"
@@ -1310,6 +1433,11 @@
                                                                                                 {subtask.dueDate && (
                                                                                                     <span className="text-xs text-gray-600 font-semibold">
                                                                                                         {formatDueDate(subtask.dueDate)}
+                                                                                                    </span>
+                                                                                                )}
+                                                                                                {subtask.repeat && subtask.repeat !== 'none' && (
+                                                                                                    <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-bold">
+                                                                                                        🔄 {subtask.repeat}
                                                                                                     </span>
                                                                                                 )}
                                                                                             </div>
@@ -1388,6 +1516,11 @@
                                                     
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-gray-500 line-through font-semibold text-lg break-words">{task.text}</p>
+                                                        {task.repeat && task.repeat !== 'none' && (
+                                                            <span className="text-xs px-2 py-1 bg-gray-200 text-gray-600 rounded-full font-bold mt-1 inline-block">
+                                                                {getRepeatLabel(task.repeat)}
+                                                            </span>
+                                                        )}
                                                         {task.subtasks && task.subtasks.length > 0 && (
                                                             <div className="mt-2 space-y-1 pl-2 border-l-2 border-gray-300">
                                                                 {task.subtasks.map(subtask => (
@@ -1398,6 +1531,11 @@
                                                                         {subtask.dueDate && (
                                                                             <span className="text-xs text-gray-400">
                                                                                 {formatDueDate(subtask.dueDate)}
+                                                                            </span>
+                                                                        )}
+                                                                        {subtask.repeat && subtask.repeat !== 'none' && (
+                                                                            <span className="text-xs text-gray-400">
+                                                                                🔄
                                                                             </span>
                                                                         )}
                                                                     </div>
@@ -1434,12 +1572,10 @@
             const [loading, setLoading] = useState(true);
 
             useEffect(() => {
-                // Check if user is already logged in
                 const savedUser = safeLocalStorage.getItem('currentUser');
                 const savedSession = safeLocalStorage.getItem('userSession');
                 
                 if (savedUser && savedSession) {
-                    // Verify session is valid (you could add server-side verification here)
                     setCurrentUser(savedUser);
                 }
                 
@@ -1472,7 +1608,6 @@
     if ('serviceWorker' in navigator) {
         let refreshing = false;
         
-        // Detect when new service worker is ready
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (refreshing) return;
             refreshing = true;
@@ -1485,23 +1620,19 @@
                 .then((registration) => {
                     console.log('✨ PWA Service Worker registered!', registration.scope);
                     
-                    // Check for updates every 30 seconds
                     setInterval(() => {
                         console.log('🔍 Checking for updates...');
                         registration.update();
                     }, 30000);
                     
-                    // Listen for updates
                     registration.addEventListener('updatefound', () => {
                         const newWorker = registration.installing;
                         console.log('📦 New version found! Installing...');
                         
                         newWorker.addEventListener('statechange', () => {
                             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                // New service worker available, tell user
                                 console.log('✅ New version ready!');
                                 
-                                // Show update notification
                                 if (confirm('🎉 New update available! Reload to get the latest version?')) {
                                     newWorker.postMessage({ type: 'SKIP_WAITING' });
                                 }
